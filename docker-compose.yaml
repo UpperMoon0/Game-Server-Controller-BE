@@ -1,0 +1,51 @@
+name: game-server-controller-be
+version: '3.8'
+
+services:
+  game-server-controller-be:
+    build: .
+    image: nstut/game-server-controller-be:latest
+    container_name: game-server-controller-be
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+      - "50051:50051"
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DATABASE_TYPE=${DATABASE_TYPE:-sqlite}
+      - DATABASE_HOST=${DATABASE_HOST:-./data/controller.db}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_NAME=${DATABASE_NAME:-game_server_controller}
+      - DATABASE_USER=${DATABASE_USER:-postgres}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-password}
+      - DATABASE_SSL_MODE=${DATABASE_SSL_MODE:-disable}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_DB=${REDIS_DB:-0}
+      - DEFAULT_HEARTBEAT_INTERVAL=${DEFAULT_HEARTBEAT_INTERVAL:-30}
+      - NODE_TIMEOUT=${NODE_TIMEOUT:-120}
+      - METRICS_ENABLED=${METRICS_ENABLED:-true}
+      - METRICS_INTERVAL=${METRICS_INTERVAL:-5}
+      - METRICS_RETENTION_DAYS=${METRICS_RETENTION_DAYS:-30}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - AUTH_ENABLED=${AUTH_ENABLED:-false}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - JWT_EXPIRY=${JWT_EXPIRY:-3600}
+      - CLUSTER_ENABLED=${CLUSTER_ENABLED:-false}
+      - CLUSTER_NODE_ID=${CLUSTER_NODE_ID:-controller-1}
+      - CLUSTER_ADDRESS=${CLUSTER_ADDRESS:-}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.game-server-controller-be.rule=Host(`controller.nstut.cloud`)"
+      - "traefik.http.routers.game-server-controller-be.entrypoints=websecure"
+      - "traefik.http.routers.game-server-controller-be.tls.certresolver=myresolver"
+      - "traefik.http.services.game-server-controller-be.loadbalancer.server.port=8080"
+    networks:
+      - nstut-network
+
+networks:
+  nstut-network:
+    name: nstut-network
+    external: true
