@@ -1,0 +1,48 @@
+# Game Server Controller Configuration
+# This file contains all configuration for the controller service
+
+# Server Configuration
+environment: "development"
+rest_host: "0.0.0.0"
+rest_port: 8080
+grpc_host: "0.0.0.0"
+grpc_port: 50051
+
+# Database Configuration
+database_type: "sqlite"
+database_host: "./data/controller.db"
+database_port: 5432
+database_name: "game_server_controller"
+database_user: "postgres"
+database_password: "password"
+database_ssl_mode: "disable"
+
+# Redis Configuration
+redis_host: "localhost"
+redis_port: 6379
+redis_password: ""
+redis_db: 0
+
+# Node Configuration
+default_heartbeat_interval: 30
+node_timeout: 120
+
+# Metrics Configuration
+metrics_enabled: true
+metrics_interval: 5
+metrics_retention_days: 30
+
+# Logging Configuration
+log_level: "info"
+log_format: "json"
+log_file_path: "./logs/controller.log"
+
+# Authentication (optional)
+auth_enabled: false
+jwt_secret: "your-secret-key-here"
+jwt_expiry: 3600
+
+# Clustering (optional for high availability)
+cluster_enabled: false
+cluster_node_id: "controller-1"
+cluster_address: ""
