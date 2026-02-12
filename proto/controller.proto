@@ -1,0 +1,393 @@
+syntax = "proto3";
+
+package controller;
+
+option go_package = "github.com/game-server/controller/proto";
+
+import "proto/common.proto";
+
+// Node Service - Handles node registration and communication
+service NodeService {
+    // Register a new node with the controller
+    rpc RegisterNode(RegisterNodeRequest) returns (RegisterNodeResponse);
+    
+    // Establish bidirectional streaming for events and commands
+    rpc StreamEvents(stream NodeEvent) returns (stream ControllerCommand);
+    
+    // Update node status and metrics
+    rpc UpdateNodeStatus(UpdateNodeStatusRequest) returns (UpdateNodeStatusResponse);
+    
+    // Get node configuration from controller
+    rpc GetNodeConfig(GetNodeConfigRequest) returns (GetNodeConfigResponse);
+}
+
+// Server Service - Handles game server lifecycle management
+service ServerService {
+    // Create a new game server on a node
+    rpc CreateServer(CreateServerRequest) returns (CreateServerResponse);
+    
+    // Update server configuration
+    rpc UpdateServer(UpdateServerRequest) returns (UpdateServerResponse);
+    
+    // Delete a server
+    rpc DeleteServer(DeleteServerRequest) returns (DeleteServerResponse);
+    
+    // Start a server
+    rpc StartServer(StartServerRequest) returns (StartServerResponse);
+    
+    // Stop a server
+    rpc StopServer(StopServerRequest) returns (StopServerResponse);
+    
+    // Get server current status
+    rpc GetServerStatus(GetServerStatusRequest) returns (GetServerStatusResponse);
+    
+    // Stream server logs in real-time
+    rpc StreamServerLogs(StreamLogsRequest) returns (stream LogEntry);
+}
+
+// Metrics Service - Handles real-time metrics collection
+service MetricsService {
+    // Stream node and server metrics
+    rpc StreamMetrics(StreamMetricsRequest) returns (stream NodeMetrics);
+}
+
+// Message Definitions
+
+message RegisterNodeRequest {
+    string node_id = 1;
+    string hostname = 2;
+    string ip_address = 3;
+    NodeResources resources = 4;
+    repeated string supported_games = 5;
+    string os_version = 6;
+    string agent_version = 7;
+}
+
+message RegisterNodeResponse {
+    string controller_id = 1;
+    int64 heartbeat_interval_seconds = 2;
+    repeated ServerAssignment pending_servers = 3;
+    ControllerConfig controller_config = 4;
+}
+
+message NodeEvent {
+    string node_id = 1;
+    EventType type = 2;
+    int64 timestamp = 3;
+    oneof payload {
+        NodeStatus status = 4;
+        ServerStatus server_status = 5;
+        MetricsSnapshot metrics = 6;
+        LogEntry log = 7;
+        ErrorInfo error = 8;
+    }
+}
+
+enum EventType {
+    EVENT_TYPE_UNSPECIFIED = 0;
+    EVENT_TYPE_NODE_ONLINE = 1;
+    EVENT_TYPE_NODE_OFFLINE = 2;
+    EVENT_TYPE_NODE_STATUS_UPDATE = 3;
+    EVENT_TYPE_SERVER_CREATED = 4;
+    EVENT_TYPE_SERVER_STARTED = 5;
+    EVENT_TYPE_SERVER_STOPPED = 6;
+    EVENT_TYPE_SERVER_ERROR = 7;
+    EVENT_TYPE_METRICS_UPDATE = 8;
+    EVENT_TYPE_LOG = 9;
+    EVENT_TYPE_HEARTBEAT = 10;
+}
+
+message ControllerCommand {
+    string command_id = 1;
+    string server_id = 2;
+    CommandType type = 3;
+    int64 timestamp = 4;
+    oneof payload {
+        CreateServerCommand create_server = 5;
+        UpdateServerCommand update_server = 6;
+        DeleteServerCommand delete_server = 7;
+        StartServerCommand start_server = 8;
+        StopServerCommand stop_server = 9;
+    }
+}
+
+enum CommandType {
+    COMMAND_TYPE_UNSPECIFIED = 0;
+    COMMAND_TYPE_CREATE_SERVER = 1;
+    COMMAND_TYPE_UPDATE_SERVER = 2;
+    COMMAND_TYPE_DELETE_SERVER = 3;
+    COMMAND_TYPE_START_SERVER = 4;
+    COMMAND_TYPE_STOP_SERVER = 5;
+    COMMAND_TYPE_RESTART_SERVER = 6;
+    COMMAND_TYPE_EXECUTE_COMMAND = 7;
+}
+
+message CreateServerCommand {
+    string server_id = 1;
+    string game_type = 2;
+    ServerConfig config = 3;
+    ResourceRequirements requirements = 4;
+}
+
+message UpdateServerCommand {
+    string server_id = 1;
+    ServerConfig config = 2;
+    bool restart_required = 3;
+}
+
+message DeleteServerCommand {
+    string server_id = 1;
+    bool backup_before_delete = 2;
+}
+
+message StartServerCommand {
+    string server_id = 1;
+    map<string, string> environment = 2;
+}
+
+message StopServerCommand {
+    string server_id = 1;
+    int32 grace_period_seconds = 2;
+    string reason = 3;
+}
+
+message ServerConfig {
+    string name = 1;
+    string version = 2;
+    map<string, string> settings = 3;
+    repeated string mods = 4;
+    int32 max_players = 5;
+    string world_name = 6;
+    bool online_mode = 7;
+    string query_type = 8;
+}
+
+message ResourceRequirements {
+    int32 min_cpu_cores = 1;
+    int64 min_memory_mb = 2;
+    int64 min_storage_mb = 3;
+    int32 max_cpu_cores = 4;
+    int64 max_memory_mb = 5;
+    int32 max_players = 6;
+    int32 network_bandwidth_mbps = 7;
+}
+
+message NodeResources {
+    int32 total_cpu_cores = 1;
+    int64 total_memory_mb = 2;
+    int64 total_storage_mb = 3;
+    int32 available_cpu_cores = 4;
+    int64 available_memory_mb = 5;
+    int64 available_storage_mb = 6;
+    string cpu_model = 7;
+    string network_interface = 8;
+    int64 network_speed_mbps = 9;
+}
+
+message NodeStatus {
+    string node_id = 1;
+    NodeHealth health = 2;
+    NodeResources resources = 3;
+    int64 uptime_seconds = 4;
+    int32 active_servers = 5;
+    int32 queued_tasks = 6;
+    int64 timestamp = 7;
+}
+
+enum NodeHealth {
+    NODE_HEALTH_UNSPECIFIED = 0;
+    NODE_HEALTH_HEALTHY = 1;
+    NODE_HEALTH_DEGRADED = 2;
+    NODE_HEALTH_UNHEALTHY = 3;
+    NODE_HEALTH_CRITICAL = 4;
+}
+
+message ServerStatus {
+    string server_id = 1;
+    ServerState state = 2;
+    int32 player_count = 3;
+    repeated string online_players = 4;
+    int64 uptime_seconds = 5;
+    int32 cpu_usage_percent = 6;
+    int64 memory_usage_mb = 7;
+    int32 tps = 8;
+    int32 mspt = 9;
+    int64 timestamp = 10;
+}
+
+enum ServerState {
+    SERVER_STATE_UNSPECIFIED = 0;
+    SERVER_STATE_INSTALLING = 1;
+    SERVER_STATE_CONFIGURING = 2;
+    SERVER_STATE_STARTING = 3;
+    SERVER_STATE_RUNNING = 4;
+    SERVER_STATE_STOPPING = 5;
+    SERVER_STATE_STOPPED = 6;
+    SERVER_STATE_ERROR = 7;
+    SERVER_STATE_BACKING_UP = 8;
+    SERVER_STATE_UPDATING = 9;
+}
+
+message MetricsSnapshot {
+    string node_id = 1;
+    float cpu_usage_percent = 2;
+    float memory_usage_percent = 3;
+    float storage_usage_percent = 4;
+    int64 network_bytes_in = 5;
+    int64 network_bytes_out = 6;
+    int32 active_connections = 7;
+    int64 timestamp = 8;
+}
+
+message LogEntry {
+    string server_id = 1;
+    LogLevel level = 2;
+    string message = 3;
+    string source = 4;
+    int64 timestamp = 5;
+    int32 line_number = 6;
+}
+
+enum LogLevel {
+    LOG_LEVEL_UNSPECIFIED = 0;
+    LOG_LEVEL_DEBUG = 1;
+    LOG_LEVEL_INFO = 2;
+    LOG_LEVEL_WARNING = 3;
+    LOG_LEVEL_ERROR = 4;
+    LOG_LEVEL_FATAL = 5;
+}
+
+message ErrorInfo {
+    string code = 1;
+    string message = 2;
+    string details = 3;
+    string stack_trace = 4;
+}
+
+// Request/Response Messages
+
+message UpdateNodeStatusRequest {
+    string node_id = 1;
+    NodeStatus status = 2;
+}
+
+message UpdateNodeStatusResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message GetNodeConfigRequest {
+    string node_id = 1;
+}
+
+message GetNodeConfigResponse {
+    ControllerConfig config = 1;
+}
+
+message ControllerConfig {
+    string controller_address = 1;
+    int32 grpc_port = 2;
+    int32 rest_port = 3;
+    int64 metrics_interval_seconds = 4;
+    bool auto_update_enabled = 5;
+}
+
+message CreateServerRequest {
+    string node_id = 1;
+    string game_type = 2;
+    ServerConfig config = 3;
+    ResourceRequirements requirements = 4;
+}
+
+message CreateServerResponse {
+    bool success = 1;
+    string server_id = 2;
+    string message = 3;
+    ServerInfo info = 4;
+}
+
+message ServerInfo {
+    string server_id = 1;
+    string node_id = 2;
+    int32 port = 3;
+    string rcon_address = 4;
+    int32 rcon_port = 5;
+}
+
+message UpdateServerRequest {
+    string server_id = 1;
+    ServerConfig config = 2;
+    bool restart = 3;
+}
+
+message UpdateServerResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message DeleteServerRequest {
+    string server_id = 1;
+    bool backup = 2;
+}
+
+message DeleteServerResponse {
+    bool success = 1;
+    string message = 2;
+    string backup_path = 3;
+}
+
+message StartServerRequest {
+    string server_id = 1;
+}
+
+message StartServerResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message StopServerRequest {
+    string server_id = 1;
+    int32 grace_period = 2;
+}
+
+message StopServerResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message GetServerStatusRequest {
+    string server_id = 1;
+}
+
+message GetServerStatusResponse {
+    ServerStatus status = 1;
+}
+
+message StreamLogsRequest {
+    string server_id = 1;
+    LogLevel min_level = 2;
+    int32 tail_lines = 3;
+    bool follow = 4;
+}
+
+message StreamMetricsRequest {
+    string node_id = 1;
+    int64 interval_ms = 2;
+}
+
+message NodeMetrics {
+    string node_id = 1;
+    float cpu_usage = 2;
+    float memory_usage = 3;
+    float storage_usage = 4;
+    int64 network_in = 5;
+    int64 network_out = 6;
+    int32 load_average = 7;
+    int64 timestamp = 8;
+}
+
+message ServerAssignment {
+    string server_id = 1;
+    string game_type = 2;
+    ServerConfig config = 3;
+}
