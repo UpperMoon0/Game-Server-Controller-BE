@@ -11,7 +11,7 @@ import (
 	"github.com/game-server/controller/pkg/config"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -37,7 +37,7 @@ func NewGRPCServer(
 	opts = append(opts,
 		grpc.MaxRecvMsgSize(10*1024*1024), // 10MB
 		grpc.MaxSendMsgSize(10*1024*1024), // 10MB
-		grpc.KeepaliveParams(grpc.KeepaliveParams{
+		grpc.KeepaliveParams(keepalive.ServerParameters{
 			MaxConnectionIdle:     5 * time.Minute,
 			MaxConnectionAge:     30 * time.Minute,
 			MaxConnectionAgeGrace: 5 * time.Second,

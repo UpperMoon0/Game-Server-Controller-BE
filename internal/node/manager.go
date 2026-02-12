@@ -41,7 +41,7 @@ type Command struct {
 	ID        string
 	Type      CommandType
 	Payload   interface{}
-	Response  chan<- *CommandResult
+	Response  chan *CommandResult
 }
 
 // CommandType represents the type of command
@@ -198,6 +198,28 @@ func (m *Manager) UpdateNodeStatus(nodeID string, status models.NodeStatus) erro
 
 	state.Node.Status = status
 	state.LastHeartbeat = time.Now()
+
+	return nil
+}
+
+// Update updates a node
+func (m *Manager) Update(node *models.Node) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	state, exists := m.nodes[node.ID]
+	if !exists {
+		return fmt.Errorf("node not found: %s", node.ID)
+	}
+
+	state.Node = node
+	state.LastHeartbeat = time.Now()
+
+	// Update in database
+	ctx := context.Background()
+	if err := m.nodeRepo.Update(ctx, node); err != nil {
+		return fmt.Errorf("failed to update node in database: %w", err)
+	}
 
 	return nil
 }

@@ -37,20 +37,20 @@ func NewScheduler(
 // CreateServer creates a new server on the optimal node
 func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRequest) (*models.CreateServerResponse, error) {
 	// Find optimal node for the server
-	node, err := s.FindOptimalNode(req.GameType, &req.Requirements)
+	targetNode, err := s.FindOptimalNode(req.GameType, &req.Requirements)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find optimal node: %w", err)
 	}
 
 	// Allocate resources
-	if err := s.AllocateResources(node.ID, &req.Requirements); err != nil {
+	if err := s.AllocateResources(targetNode.ID, &req.Requirements); err != nil {
 		return nil, fmt.Errorf("failed to allocate resources: %w", err)
 	}
 
 	// Create server configuration
 	server := &models.Server{
 		Name:          req.Config.Name,
-		NodeID:        node.ID,
+		NodeID:        targetNode.ID,
 		GameType:      req.GameType,
 		Status:        models.ServerStatusInstalling,
 		Version:       req.Config.Version,
@@ -62,7 +62,7 @@ func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRe
 		Port:          0, // Will be assigned by node
 		QueryPort:     0,
 		RCONPort:      0,
-		IPAddress:     node.IPAddress,
+		IPAddress:     targetNode.IPAddress,
 		PlayerCount:   0,
 		CPUUsage:      0,
 		MemoryUsage:   0,
@@ -71,7 +71,7 @@ func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRe
 
 	// Create server in database
 	if err := s.serverRepo.Create(ctx, server); err != nil {
-		s.ReleaseResources(node.ID, &req.Requirements)
+		s.ReleaseResources(targetNode.ID, &req.Requirements)
 		return nil, fmt.Errorf("failed to create server: %w", err)
 	}
 
@@ -88,9 +88,9 @@ func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRe
 		Response: make(chan *node.CommandResult, 1),
 	}
 
-	if err := s.nodeMgr.SendCommand(node.ID, cmd); err != nil {
+	if err := s.nodeMgr.SendCommand(targetNode.ID, cmd); err != nil {
 		s.serverRepo.Delete(ctx, server.ID)
-		s.ReleaseResources(node.ID, &req.Requirements)
+		s.ReleaseResources(targetNode.ID, &req.Requirements)
 		return nil, fmt.Errorf("failed to send create command: %w", err)
 	}
 
@@ -99,7 +99,7 @@ func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRe
 	case result := <-cmd.Response:
 		if !result.Success {
 			s.serverRepo.Delete(ctx, server.ID)
-			s.ReleaseResources(node.ID, &req.Requirements)
+			s.ReleaseResources(targetNode.ID, &req.Requirements)
 			return nil, fmt.Errorf("failed to create server on node: %s", result.Message)
 		}
 	case <-time.After(60 * time.Second):
@@ -108,7 +108,7 @@ func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRe
 
 	s.logger.Info("Server created",
 		zap.String("server_id", server.ID),
-		zap.String("node_id", node.ID),
+		zap.String("node_id", targetNode.ID),
 		zap.String("game_type", req.GameType))
 
 	return &models.CreateServerResponse{
@@ -117,7 +117,7 @@ func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRe
 		Message:   "Server created successfully",
 		ServerInfo: &models.ServerInfo{
 			ServerID:  server.ID,
-			NodeID:    node.ID,
+			NodeID:    targetNode.ID,
 			Port:      server.Port,
 			IPAddress: server.IPAddress,
 		},
@@ -301,7 +301,7 @@ func (s *Scheduler) ReinstallServer(ctx context.Context, serverID string) error 
 
 // BackupServer backs up a server
 func (s *Scheduler) BackupServer(ctx context.Context, serverID string) error {
-	server, err := s.serverRepo.GetByID(ctx, serverID)
+	_, err := s.serverRepo.GetByID(ctx, serverID)
 	if err != nil {
 		return fmt.Errorf("server not found: %w", err)
 	}

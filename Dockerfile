@@ -3,14 +3,17 @@ FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
-# Copy go module files
-COPY go.mod go.sum ./
+# Copy go module files first
+COPY go.mod ./
 
-# Download dependencies
+# Download dependencies and create go.sum
 RUN go mod download
 
 # Copy source code
 COPY . .
+
+# Get all dependencies to populate go.sum
+RUN go get ./...
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o controller ./cmd/controller

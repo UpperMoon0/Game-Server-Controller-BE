@@ -177,8 +177,7 @@ func (h *NodeHandler) UpdateNode(c *gin.Context) {
 		node.Status = *req.Status
 	}
 
-	ctx := c.Request.Context()
-	if err := h.nodeRepo.UpdateNode(node); err != nil {
+	if err := h.nodeRepo.Update(node); err != nil {
 		h.logger.Error("Failed to update node", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to update node",
@@ -276,7 +275,7 @@ func (h *NodeHandler) NodeAction(c *gin.Context) {
 			return
 		}
 		node.Status = models.NodeStatusMaintenance
-		if err := h.nodeRepo.UpdateNode(node); err != nil {
+		if err := h.nodeRepo.Update(node); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "Failed to set maintenance mode",
 				"message": err.Error(),

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,7 +14,6 @@ import (
 	"github.com/game-server/controller/internal/node"
 	"github.com/game-server/controller/internal/scheduler"
 	"github.com/game-server/controller/pkg/config"
-	"github.com/game-server/controller/pkg/logger"
 	"go.uber.org/zap"
 )
 
@@ -33,7 +31,12 @@ func main() {
 	}
 
 	// Initialize logger
-	log, err := logger.NewFromConfig(cfg.LogLevel, cfg.LogFormat, cfg.LogFilePath)
+	var log *zap.Logger
+	if cfg.LogFormat == "json" {
+		log, err = zap.NewProduction()
+	} else {
+		log, err = zap.NewDevelopment()
+	}
 	if err != nil {
 		fmt.Printf("Failed to initialize logger: %v\n", err)
 		os.Exit(1)
@@ -77,7 +80,7 @@ func main() {
 	}
 
 	// Initialize REST API server
-	restServer := rest.NewServer(cfg, nodeRepo, serverRepo, metricsRepo, nodeMgr, sched, log)
+	restServer := rest.NewServer(cfg, nodeMgr, serverRepo, metricsRepo, sched, log)
 
 	// Start gRPC server
 	go func() {

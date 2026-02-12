@@ -61,7 +61,7 @@ func NewServer(
 }
 
 // Start starts the REST API server
-func (s *S) Start() error {
+func (s *Server) Start() error {
 	// Register routes
 	s.registerRoutes()
 
@@ -134,7 +134,8 @@ func (s *Server) healthCheck(c *gin.Context) {
 
 func (s *Server) readinessCheck(c *gin.Context) {
 	// Check if database is accessible
-	if err := s.serverRepo.CountByStatus(c.Request.Context()); err != nil {
+	_, err := s.serverRepo.CountByStatus(c.Request.Context())
+	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status":  "not ready",
 			"error":   err.Error(),
