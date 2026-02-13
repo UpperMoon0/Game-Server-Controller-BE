@@ -316,3 +316,30 @@ func (r *ServerRepository) CountByStatus(ctx context.Context) (map[models.Server
 
 	return result, nil
 }
+
+// DeleteByNodeID deletes all servers for a given node ID
+func (r *ServerRepository) DeleteByNodeID(ctx context.Context, nodeID string) (int, error) {
+	query := `DELETE FROM servers WHERE node_id = $1`
+
+	result, err := r.db.ExecContext(ctx, query, nodeID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete servers by node: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	r.logger.Info("Deleted servers by node",
+		zap.String("node_id", nodeID),
+		zap.Int64("count", rowsAffected))
+
+	return int(rowsAffected), nil
+}
+
+// GetByNodeID retrieves all servers for a given node ID
+func (r *ServerRepository) GetByNodeID(ctx context.Context, nodeID string) ([]*models.Server, error) {
+	filters := &models.ServerFilters{NodeID: nodeID}
+	return r.List(ctx, filters)
+}

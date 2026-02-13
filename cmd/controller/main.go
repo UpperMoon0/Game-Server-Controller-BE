@@ -11,6 +11,7 @@ import (
 	"github.com/game-server/controller/internal/api/grpc/server"
 	"github.com/game-server/controller/internal/api/rest"
 	"github.com/game-server/controller/internal/core/repository"
+	"github.com/game-server/controller/internal/docker"
 	"github.com/game-server/controller/internal/node"
 	"github.com/game-server/controller/internal/scheduler"
 	"github.com/game-server/controller/pkg/config"
@@ -62,13 +63,37 @@ func main() {
 	}
 	defer redis.Close()
 
+	// Initialize Docker volume manager
+	volumeMgr, err := docker.NewVolumeManager(log)
+	if err != nil {
+		log.Warn("Failed to initialize Docker volume manager, volume cleanup will be disabled", zap.Error(err))
+		// Continue without volume manager - deletion will still work, just won't clean up volumes
+	}
+
+	// Initialize Docker container manager
+	var containerMgr *docker.ContainerManager
+	if volumeMgr != nil {
+		containerMgr, err = docker.NewContainerManager(volumeMgr, log)
+		if err != nil {
+			log.Warn("Failed to initialize Docker container manager, dynamic node creation will be disabled", zap.Error(err))
+			// Continue without container manager - nodes can still register manually
+		}
+	}
+
+	if volumeMgr != nil {
+		defer volumeMgr.Close()
+	}
+	if containerMgr != nil {
+		defer containerMgr.Close()
+	}
+
 	// Initialize repositories
 	nodeRepo := repository.NewNodeRepository(db, log)
 	serverRepo := repository.NewServerRepository(db, log)
 	metricsRepo := repository.NewMetricsRepository(redis, log)
 
 	// Initialize node manager
-	nodeMgr := node.NewManager(nodeRepo, serverRepo, metricsRepo, cfg, log)
+	nodeMgr := node.NewManager(nodeRepo, serverRepo, metricsRepo, volumeMgr, containerMgr, cfg, log)
 
 	// Initialize scheduler
 	sched := scheduler.NewScheduler(nodeRepo, serverRepo, nodeMgr, log)

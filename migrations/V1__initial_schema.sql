@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS nodes (
 CREATE TABLE IF NOT EXISTS servers (
     id VARCHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    node_id VARCHAR(36) NOT NULL REFERENCES nodes(id),
+    node_id VARCHAR(36) NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
     game_type VARCHAR(100) NOT NULL,
     instance_id VARCHAR(36) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'stopped',
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS servers (
 -- Node events table
 CREATE TABLE IF NOT EXISTS node_events (
     id VARCHAR(36) PRIMARY KEY,
-    node_id VARCHAR(36) NOT NULL REFERENCES nodes(id),
+    node_id VARCHAR(36) NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
     type VARCHAR(50) NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data TEXT

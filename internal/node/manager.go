@@ -8,17 +8,20 @@ import (
 
 	"github.com/game-server/controller/internal/core/models"
 	"github.com/game-server/controller/internal/core/repository"
+	"github.com/game-server/controller/internal/docker"
 	"github.com/game-server/controller/pkg/config"
 	"go.uber.org/zap"
 )
 
 // Manager handles node lifecycle and communication
 type Manager struct {
-	nodeRepo     *repository.NodeRepository
-	serverRepo   *repository.ServerRepository
-	metricsRepo  *repository.MetricsRepository
-	cfg          *config.Config
-	logger       *zap.Logger
+	nodeRepo      *repository.NodeRepository
+	serverRepo    *repository.ServerRepository
+	metricsRepo   *repository.MetricsRepository
+	volumeMgr     *docker.VolumeManager
+	containerMgr  *docker.ContainerManager
+	cfg           *config.Config
+	logger        *zap.Logger
 	
 	// In-memory state
 	nodes        map[string]*NodeState
@@ -76,17 +79,21 @@ func NewManager(
 	nodeRepo *repository.NodeRepository,
 	serverRepo *repository.ServerRepository,
 	metricsRepo *repository.MetricsRepository,
+	volumeMgr *docker.VolumeManager,
+	containerMgr *docker.ContainerManager,
 	cfg *config.Config,
 	logger *zap.Logger,
 ) *Manager {
 	return &Manager{
-		nodeRepo:    nodeRepo,
-		serverRepo:  serverRepo,
-		metricsRepo: metricsRepo,
-		cfg:         cfg,
-		logger:      logger,
-		nodes:       make(map[string]*NodeState),
-		streams:     make(map[string]chan *StreamEvent),
+		nodeRepo:     nodeRepo,
+		serverRepo:   serverRepo,
+		metricsRepo:  metricsRepo,
+		volumeMgr:    volumeMgr,
+		containerMgr: containerMgr,
+		cfg:          cfg,
+		logger:       logger,
+		nodes:        make(map[string]*NodeState),
+		streams:      make(map[string]chan *StreamEvent),
 	}
 }
 
@@ -158,6 +165,99 @@ func (m *Manager) UnregisterNode(ctx context.Context, nodeID string) error {
 	m.logger.Info("Node unregistered", zap.String("node_id", nodeID))
 
 	return nil
+}
+
+// DeleteNode permanently deletes a node and all its servers
+func (m *Manager) DeleteNode(ctx context.Context, nodeID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	state, exists := m.nodes[nodeID]
+	if !exists {
+		// Check if node exists in database
+		node, err := m.nodeRepo.GetByID(ctx, nodeID)
+		if err != nil {
+			return fmt.Errorf("failed to check node existence: %w", err)
+		}
+		if node == nil {
+			return fmt.Errorf("node not found: %s", nodeID)
+		}
+		// Node exists in DB but not in memory, proceed with deletion
+	} else {
+		// Close command queue if node is in memory
+		close(state.CommandQueue)
+		// Remove from registry
+		delete(m.nodes, nodeID)
+	}
+
+	// Delete servers from database (cascade will handle this, but we do it explicitly for logging)
+	serverCount, err := m.serverRepo.DeleteByNodeID(ctx, nodeID)
+	if err != nil {
+		m.logger.Warn("Failed to delete servers, relying on cascade", 
+			zap.Error(err),
+			zap.String("node_id", nodeID))
+	} else {
+		m.logger.Info("Deleted servers for node",
+			zap.String("node_id", nodeID),
+			zap.Int("server_count", serverCount))
+	}
+
+	// Delete node from database
+	if err := m.nodeRepo.Delete(ctx, nodeID); err != nil {
+		return fmt.Errorf("failed to delete node from database: %w", err)
+	}
+
+	// Remove Docker container for this node
+	if m.containerMgr != nil {
+		if err := m.containerMgr.RemoveNodeContainer(ctx, nodeID); err != nil {
+			m.logger.Warn("Failed to remove node container",
+				zap.Error(err),
+				zap.String("node_id", nodeID))
+			// Don't fail the deletion, just log the warning
+		}
+	}
+
+	// Delete Docker volumes for this node
+	if m.volumeMgr != nil {
+		if err := m.volumeMgr.DeleteNodeVolumes(ctx, nodeID); err != nil {
+			m.logger.Warn("Failed to delete node volumes",
+				zap.Error(err),
+				zap.String("node_id", nodeID))
+			// Don't fail the deletion, just log the warning
+		}
+	}
+
+	m.logger.Info("Node deleted permanently",
+		zap.String("node_id", nodeID))
+
+	return nil
+}
+
+// CreateNodeContainer creates a new node container
+func (m *Manager) CreateNodeContainer(ctx context.Context, cfg *docker.NodeContainerConfig) (string, error) {
+	if m.containerMgr == nil {
+		return "", fmt.Errorf("container manager not initialized")
+	}
+
+	containerID, err := m.containerMgr.CreateNodeContainer(ctx, cfg)
+	if err != nil {
+		return "", fmt.Errorf("failed to create node container: %w", err)
+	}
+
+	m.logger.Info("Node container created",
+		zap.String("container_id", containerID),
+		zap.String("node_id", cfg.NodeID))
+
+	return containerID, nil
+}
+
+// GetNodeContainerInfo returns information about a node container
+func (m *Manager) GetNodeContainerInfo(ctx context.Context, nodeID string) (*docker.ContainerInfo, error) {
+	if m.containerMgr == nil {
+		return nil, fmt.Errorf("container manager not initialized")
+	}
+
+	return m.containerMgr.GetNodeContainerInfo(ctx, nodeID)
 }
 
 // GetNode retrieves a node by ID

@@ -6,8 +6,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/game-server/controller/internal/core/models"
+	"github.com/game-server/controller/internal/docker"
 	"github.com/game-server/controller/internal/node"
 	"github.com/game-server/controller/internal/scheduler"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -33,11 +35,13 @@ func (h *NodeHandler) RegisterRoutes(router *gin.RouterGroup) {
 	{
 		nodes.GET("", h.ListNodes)
 		nodes.POST("", h.CreateNode)
+		nodes.POST("/container", h.CreateNodeContainer)
 		nodes.GET("/:id", h.GetNode)
 		nodes.PUT("/:id", h.UpdateNode)
 		nodes.DELETE("/:id", h.DeleteNode)
 		nodes.GET("/:id/status", h.GetNodeStatus)
 		nodes.GET("/:id/metrics", h.GetNodeMetrics)
+		nodes.GET("/:id/container", h.GetNodeContainerInfo)
 		nodes.POST("/:id/action", h.NodeAction)
 	}
 }
@@ -197,7 +201,7 @@ func (h *NodeHandler) DeleteNode(c *gin.Context) {
 	id := c.Param("id")
 
 	ctx := c.Request.Context()
-	if err := h.nodeRepo.UnregisterNode(ctx, id); err != nil {
+	if err := h.nodeRepo.DeleteNode(ctx, id); err != nil {
 		h.logger.Error("Failed to delete node", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to delete node",
@@ -298,6 +302,107 @@ func (h *NodeHandler) NodeAction(c *gin.Context) {
 			"message": "Unknown action: " + req.Action,
 		})
 	}
+}
+
+// CreateNodeContainerRequest represents a request to create a node container
+type CreateNodeContainerRequest struct {
+	Name            string   `json:"name" binding:"required"`
+	Image           string   `json:"image" binding:"required"`
+	GameTypes       []string `json:"game_types" binding:"required,min=1"`
+	MaxServers      int      `json:"max_servers"`
+	TotalCPUCores   int      `json:"total_cpu_cores"`
+	TotalMemoryMB   int64    `json:"total_memory_mb"`
+	TotalStorageMB  int64    `json:"total_storage_mb"`
+	NetworkName     string   `json:"network_name"`
+}
+
+// CreateNodeContainer creates a new node container dynamically
+func (h *NodeHandler) CreateNodeContainer(c *gin.Context) {
+	var req CreateNodeContainerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Generate node ID
+	nodeID := uuid.New().String()
+
+	// Set defaults
+	if req.MaxServers == 0 {
+		req.MaxServers = 10
+	}
+	if req.TotalCPUCores == 0 {
+		req.TotalCPUCores = 4
+	}
+	if req.TotalMemoryMB == 0 {
+		req.TotalMemoryMB = 8192
+	}
+	if req.TotalStorageMB == 0 {
+		req.TotalStorageMB = 102400
+	}
+	if req.NetworkName == "" {
+		req.NetworkName = "nstut-network"
+	}
+
+	// Create container configuration
+	containerCfg := &docker.NodeContainerConfig{
+		NodeID:          nodeID,
+		NodeName:        req.Name,
+		Image:           req.Image,
+		ControllerAddr:  "game-server-controller-be:50051",
+		MaxServers:      req.MaxServers,
+		TotalCPUCores:   req.TotalCPUCores,
+		TotalMemoryMB:   req.TotalMemoryMB,
+		TotalStorageMB:  req.TotalStorageMB,
+		GameTypes:       req.GameTypes,
+		NetworkName:     req.NetworkName,
+	}
+
+	ctx := c.Request.Context()
+	containerID, err := h.nodeRepo.CreateNodeContainer(ctx, containerCfg)
+	if err != nil {
+		h.logger.Error("Failed to create node container", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to create node container",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"node_id":       nodeID,
+		"container_id":  containerID,
+		"message":       "Node container created successfully",
+	})
+}
+
+// GetNodeContainerInfo returns information about a node's container
+func (h *NodeHandler) GetNodeContainerInfo(c *gin.Context) {
+	id := c.Param("id")
+
+	ctx := c.Request.Context()
+	info, err := h.nodeRepo.GetNodeContainerInfo(ctx, id)
+	if err != nil {
+		h.logger.Error("Failed to get node container info", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to get container info",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	if info == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "Container not found",
+			"message": "No container found for this node",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, info)
 }
 
 // Helper function to count nodes by status

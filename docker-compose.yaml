@@ -33,6 +33,10 @@ services:
       - CLUSTER_ENABLED=${CLUSTER_ENABLED:-false}
       - CLUSTER_NODE_ID=${CLUSTER_NODE_ID:-controller-1}
       - CLUSTER_ADDRESS=${CLUSTER_ADDRESS:-}
+    volumes:
+      - game-server-controller-logs:/app/logs
+      - game-server-controller-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.game-server-controller-be.rule=Host(`controller.nstut.cloud`)"
@@ -46,3 +50,9 @@ networks:
   nstut-network:
     name: nstut-network
     external: true
+
+volumes:
+  game-server-controller-logs:
+    name: game-server-controller-logs
+  game-server-controller-data:
+    name: game-server-controller-data
