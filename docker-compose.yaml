@@ -2,11 +2,31 @@ name: game-server-controller-be
 version: '3.8'
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: game-server-controller-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nstut-network
+
   game-server-controller-be:
     build: .
     image: nstut/game-server-controller-be:latest
     container_name: game-server-controller-be
     restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
     ports:
       - "8082:8080"
       - "50051:50051"
@@ -19,8 +39,8 @@ services:
       - DATABASE_USER=${DATABASE_USER}
       - DATABASE_PASSWORD=${DATABASE_PASSWORD}
       - DATABASE_SSL_MODE=${DATABASE_SSL_MODE:-disable}
-      - REDIS_HOST=${REDIS_HOST:-redis}
-      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - REDIS_DB=${REDIS_DB:-0}
       - DEFAULT_HEARTBEAT_INTERVAL=${DEFAULT_HEARTBEAT_INTERVAL:-30}
@@ -52,6 +72,8 @@ networks:
     external: true
 
 volumes:
+  redis-data:
+    name: game-server-controller-redis-data
   game-server-controller-logs:
     name: game-server-controller-logs
   game-server-controller-data:
