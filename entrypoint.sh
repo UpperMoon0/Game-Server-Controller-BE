@@ -17,7 +17,7 @@ PGPASSWORD="$DATABASE_PASSWORD" psql -h "$DATABASE_HOST" -U "$DATABASE_USER" -d 
 
 echo "Running database migrations..."
 
-# Run Flyway migrations (Flyway is pre-installed in the image)
+# Run Flyway migrations
 flyway \
     -url="jdbc:postgresql://${DATABASE_HOST}:5432/${DATABASE_NAME}" \
     -user="$DATABASE_USER" \
