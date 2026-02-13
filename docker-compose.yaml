@@ -12,12 +12,12 @@ services:
       - "50051:50051"
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - DATABASE_TYPE=${DATABASE_TYPE:-sqlite}
-      - DATABASE_HOST=${DATABASE_HOST:-./data/controller.db}
+      - DATABASE_TYPE=${DATABASE_TYPE:-postgres}
+      - DATABASE_HOST=${DATABASE_HOST}
       - DATABASE_PORT=${DATABASE_PORT:-5432}
-      - DATABASE_NAME=${DATABASE_NAME:-game_server_controller}
-      - DATABASE_USER=${DATABASE_USER:-postgres}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-password}
+      - DATABASE_NAME=${DATABASE_NAME:-game_server}
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
       - DATABASE_SSL_MODE=${DATABASE_SSL_MODE:-disable}
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
@@ -30,9 +30,6 @@ services:
       - METRICS_RETENTION_DAYS=${METRICS_RETENTION_DAYS:-30}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - LOG_FORMAT=${LOG_FORMAT:-json}
-      - AUTH_ENABLED=${AUTH_ENABLED:-false}
-      - JWT_SECRET=${JWT_SECRET:-}
-      - JWT_EXPIRY=${JWT_EXPIRY:-3600}
       - CLUSTER_ENABLED=${CLUSTER_ENABLED:-false}
       - CLUSTER_NODE_ID=${CLUSTER_NODE_ID:-controller-1}
       - CLUSTER_ADDRESS=${CLUSTER_ADDRESS:-}

@@ -9,12 +9,12 @@ grpc_host: "0.0.0.0"
 grpc_port: 50051
 
 # Database Configuration
-database_type: "sqlite"
-database_host: "./data/controller.db"
+database_type: "postgres"
+database_host: ""
 database_port: 5432
-database_name: "game_server_controller"
-database_user: "postgres"
-database_password: "password"
+database_name: "game_server"
+database_user: ""
+database_password: ""
 database_ssl_mode: "disable"
 
 # Redis Configuration
@@ -36,11 +36,6 @@ metrics_retention_days: 30
 log_level: "info"
 log_format: "json"
 log_file_path: "./logs/controller.log"
-
-# Authentication (optional)
-auth_enabled: false
-jwt_secret: "your-secret-key-here"
-jwt_expiry: 3600
 
 # Clustering (optional for high availability)
 cluster_enabled: false

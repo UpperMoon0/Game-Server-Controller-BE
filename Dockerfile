@@ -3,6 +3,11 @@ FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
+#ARG for build secrets (not exposed in final image)
+ARG DB_URL
+ARG DB_USERNAME
+ARG DB_PASSWORD
+
 # Copy go module files first
 COPY go.mod ./
 
@@ -25,10 +30,17 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 
+# Set database environment variables from build args
+ENV DATABASE_HOST=${DB_URL}
+ENV DATABASE_USER=${DB_USERNAME}
+ENV DATABASE_PASSWORD=${DB_PASSWORD}
+
 # Copy binary from builder
 COPY --from=builder /app/controller .
 COPY --from=builder /app/config.yaml .
-COPY --from=builder /app/migrations ./migrations
+
+# Copy migrations if they exist
+RUN mkdir -p /app/migrations
 
 # Create directories
 RUN mkdir -p /app/data /app/logs

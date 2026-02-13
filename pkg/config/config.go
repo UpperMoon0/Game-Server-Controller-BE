@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -46,11 +45,6 @@ type Config struct {
 	LogFormat   string `mapstructure:"LOG_FORMAT"`
 	LogFilePath string `mapstructure:"LOG_FILE_PATH"`
 	
-	// Authentication
-	AuthEnabled  bool   `mapstructure:"AUTH_ENABLED"`
-	JWTSecret   string `mapstructure:"JWT_SECRET"`
-	JWTExpiry   int    `mapstructure:"JWT_EXPIRY"`
-	
 	// Clustering
 	ClusterEnabled    bool   `mapstructure:"CLUSTER_ENABLED"`
 	ClusterNodeID    string `mapstructure:"CLUSTER_NODE_ID"`
@@ -81,8 +75,6 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("METRICS_RETENTION_DAYS", 30)
 	v.SetDefault("LOG_LEVEL", "info")
 	v.SetDefault("LOG_FORMAT", "json")
-	v.SetDefault("AUTH_ENABLED", false)
-	v.SetDefault("JWT_EXPIRY", 3600)
 	v.SetDefault("CLUSTER_ENABLED", false)
 
 	// Set config file
@@ -97,8 +89,6 @@ func Load(configPath string) (*Config, error) {
 	}
 
 	// Environment variables
-	v.SetEnvPrefix("GSC")
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
 	// Read config file
