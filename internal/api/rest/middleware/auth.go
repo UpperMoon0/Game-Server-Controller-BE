@@ -44,10 +44,8 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 			return
 		}
 
-		token := parts[1]
-
-		// TODO: Validate JWT token
-		// claims, err := ValidateToken(token, m.jwtSecret)
+		// TODO: Validate JWT token - token is in parts[1]
+		// claims, err := ValidateToken(parts[1], m.jwtSecret)
 		// if err != nil {
 		// 	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 		// 		"error":   "Unauthorized",
