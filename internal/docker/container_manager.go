@@ -142,7 +142,7 @@ func (cm *ContainerManager) CreateNodeContainer(ctx context.Context, cfg *NodeCo
 	// Start container
 	if err := cm.client.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		// Clean up container on start failure
-		cm.client.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true})
+		_ = cm.client.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
 		return "", fmt.Errorf("failed to start container: %w", err)
 	}
 
@@ -202,7 +202,7 @@ func (cm *ContainerManager) RemoveNodeContainer(ctx context.Context, nodeID stri
 	}
 
 	// Remove container
-	if err := cm.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
+	if err := cm.client.ContainerRemove(ctx, containerID, container.RemoveOptions{
 		Force: true,
 	}); err != nil {
 		return fmt.Errorf("failed to remove container: %w", err)
@@ -249,7 +249,7 @@ func (cm *ContainerManager) GetNodeContainerInfo(ctx context.Context, nodeID str
 
 // ListNodeContainers lists all node containers
 func (cm *ContainerManager) ListNodeContainers(ctx context.Context) ([]*ContainerInfo, error) {
-	containers, err := cm.client.ContainerList(ctx, types.ContainerListOptions{
+	containers, err := cm.client.ContainerList(ctx, container.ListOptions{
 		Filters: filters.NewArgs(filters.KeyValuePair{
 			Key:   "label",
 			Value: "game-server.managed=true",
@@ -276,7 +276,7 @@ func (cm *ContainerManager) ListNodeContainers(ctx context.Context) ([]*Containe
 
 // findContainerByNodeID finds a container by node ID label
 func (cm *ContainerManager) findContainerByNodeID(ctx context.Context, nodeID string) (string, error) {
-	containers, err := cm.client.ContainerList(ctx, types.ContainerListOptions{
+	containers, err := cm.client.ContainerList(ctx, container.ListOptions{
 		All: true,
 		Filters: filters.NewArgs(filters.KeyValuePair{
 			Key:   "label",

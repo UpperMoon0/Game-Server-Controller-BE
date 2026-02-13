@@ -7,6 +7,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"go.uber.org/zap"
 )
@@ -68,10 +69,12 @@ func (vm *VolumeManager) DeleteNodeVolumes(ctx context.Context, nodeID string) e
 // deleteVolume deletes a single volume by name
 func (vm *VolumeManager) deleteVolume(ctx context.Context, volumeName string) error {
 	// Check if volume exists
-	volumes, err := vm.client.VolumeList(ctx, filters.NewArgs(filters.KeyValuePair{
-		Key:   "name",
-		Value: volumeName,
-	}))
+	volumes, err := vm.client.VolumeList(ctx, volume.ListOptions{
+		Filters: filters.NewArgs(filters.KeyValuePair{
+			Key:   "name",
+			Value: volumeName,
+		}),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to list volumes: %w", err)
 	}
@@ -103,7 +106,7 @@ func (vm *VolumeManager) deleteVolume(ctx context.Context, volumeName string) er
 func (vm *VolumeManager) ListNodeVolumes(ctx context.Context, nodeID string) ([]*types.Volume, error) {
 	volumeNames := vm.GetNodeVolumeNames(nodeID)
 	
-	volumes, err := vm.client.VolumeList(ctx, filters.NewArgs())
+	volumes, err := vm.client.VolumeList(ctx, volume.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list volumes: %w", err)
 	}
