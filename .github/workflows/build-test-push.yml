@@ -113,6 +113,7 @@ jobs:
             DB_URL=${{ steps.kv.outputs.DB_URL }}
             DB_USERNAME=${{ steps.kv.outputs.DB_USERNAME }}
             DB_PASSWORD=${{ steps.kv.outputs.DB_PASSWORD }}
+            DB_NAME=game_server
 
       - name: Extract image tag
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

@@ -1,12 +1,6 @@
+-- Flyway Migration: V1__initial_schema.sql
 -- Game Server Controller Database Migration
 -- This script creates the database and required tables
-
--- Create database if not exists (run as superuser/owner)
--- Note: Run this separately if you don't have permission to create databases
--- CREATE DATABASE game_server;
-
--- Connect to the database
--- \c game_server
 
 -- Nodes table
 CREATE TABLE IF NOT EXISTS nodes (
@@ -73,7 +67,3 @@ CREATE INDEX IF NOT EXISTS idx_servers_status ON servers(status);
 CREATE INDEX IF NOT EXISTS idx_servers_game_type ON servers(game_type);
 CREATE INDEX IF NOT EXISTS idx_node_events_node_id ON node_events(node_id);
 CREATE INDEX IF NOT EXISTS idx_node_events_timestamp ON node_events(timestamp);
-
--- Grant permissions (adjust as needed)
--- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO your_user;
--- GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO your_user;

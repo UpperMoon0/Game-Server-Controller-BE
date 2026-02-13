@@ -7,6 +7,7 @@ WORKDIR /app
 ARG DB_URL
 ARG DB_USERNAME
 ARG DB_PASSWORD
+ARG DB_NAME
 
 # Copy go module files first
 COPY go.mod ./
@@ -26,7 +27,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o controller ./cmd/
 # Production stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates curl
+
+# Install Flyway with PostgreSQL JDBC driver
+RUN curl -L -o /usr/local/flyway.tar.gz https://download.red-gate.com/flyway-commandline-10.4.1-linux-x64.tar.gz && \
+    tar -xzf /usr/local/flyway.tar.gz -C /usr/local && \
+    rm /usr/local/flyway.tar.gz && \
+    ln -s /usr/local/flyway-10.4.1/flyway /usr/local/bin/flyway && \
+    curl -L -o /usr/local/flyway-10.4.1/lib/postgresql.jar https://jdbc.postgresql.org/download/postgresql-42.7.1.jar
 
 WORKDIR /app
 
@@ -34,13 +42,14 @@ WORKDIR /app
 ENV DATABASE_HOST=${DB_URL}
 ENV DATABASE_USER=${DB_USERNAME}
 ENV DATABASE_PASSWORD=${DB_PASSWORD}
+ENV DATABASE_NAME=${DB_NAME}
 
 # Copy binary from builder
 COPY --from=builder /app/controller .
 COPY --from=builder /app/config.yaml .
 
-# Copy migrations if they exist
-RUN mkdir -p /app/migrations
+# Copy migrations
+COPY --from=builder /app/migrations ./migrations
 
 # Create directories
 RUN mkdir -p /app/data /app/logs
@@ -51,5 +60,5 @@ EXPOSE 8080 50051
 # Set environment variables
 ENV CONFIG_PATH=/app/config.yaml
 
-# Entry point
-ENTRYPOINT ["./controller"]
+# Run Flyway migration on startup
+CMD ["sh", "-c", "apk add --no-cache postgresql-client && psql -h $DATABASE_HOST -U $DATABASE_USER -c 'CREATE DATABASE $DATABASE_NAME;' 2>/dev/null || true && flyway -url=jdbc:postgresql://$DATABASE_HOST:5432/$DATABASE_NAME -user=$DATABASE_USER -password=$DATABASE_PASSWORD migrate && ./controller"]
