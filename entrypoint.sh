@@ -17,17 +17,8 @@ PGPASSWORD="$DATABASE_PASSWORD" psql -h "$DATABASE_HOST" -U "$DATABASE_USER" -d 
 
 echo "Running database migrations..."
 
-# Download and run Flyway
-FLYWAY_VERSION="10.4.1"
-curl -L -o /tmp/flyway.tar.gz "https://download.red-gate.com/flyway-commandline-${FLYWAY_VERSION}-linux-x64.tar.gz"
-tar -xzf /tmp/flyway.tar.gz -C /tmp
-rm /tmp/flyway.tar.gz
-
-# Download PostgreSQL JDBC driver
-curl -L -o /tmp/flyway/lib/postgresql.jar "https://jdbc.postgresql.org/download/postgresql-42.7.1.jar"
-
-# Run Flyway migrations
-/tmp/flyway-${FLYWAY_VERSION}/flyway \
+# Run Flyway migrations (Flyway is pre-installed in the image)
+flyway \
     -url="jdbc:postgresql://${DATABASE_HOST}:5432/${DATABASE_NAME}" \
     -user="$DATABASE_USER" \
     -password="$DATABASE_PASSWORD" \
