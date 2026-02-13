@@ -24,7 +24,7 @@ FROM alpine:latest
 RUN apk --no-cache add ca-certificates postgresql-client curl
 
 # Install Flyway with PostgreSQL JDBC driver
-RUN curl -L -o /tmp/flyway.tar.gz "https://download.red-gate.com/flyway-commandline-10.4.1-linux-x64.tar.gz" && \
+RUN curl -L -o /tmp/flyway.tar.gz "https://repo1.maven.org/maven2/com/redgate/flyway/flyway-commandline/10.4.1/flyway-commandline-10.4.1.tar.gz" && \
     tar -xzf /tmp/flyway.tar.gz -C /opt && \
     rm /tmp/flyway.tar.gz && \
     curl -L -o /opt/flyway-10.4.1/lib/postgresql.jar "https://jdbc.postgresql.org/download/postgresql-42.7.1.jar" && \
