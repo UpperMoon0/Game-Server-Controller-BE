@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
@@ -140,7 +139,7 @@ func (cm *ContainerManager) CreateNodeContainer(ctx context.Context, cfg *NodeCo
 	}
 
 	// Start container
-	if err := cm.client.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := cm.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		// Clean up container on start failure
 		_ = cm.client.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
 		return "", fmt.Errorf("failed to start container: %w", err)

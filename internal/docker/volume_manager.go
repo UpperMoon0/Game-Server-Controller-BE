@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
@@ -103,7 +102,7 @@ func (vm *VolumeManager) deleteVolume(ctx context.Context, volumeName string) er
 }
 
 // ListNodeVolumes lists all volumes for a node
-func (vm *VolumeManager) ListNodeVolumes(ctx context.Context, nodeID string) ([]*types.Volume, error) {
+func (vm *VolumeManager) ListNodeVolumes(ctx context.Context, nodeID string) ([]*volume.Volume, error) {
 	volumeNames := vm.GetNodeVolumeNames(nodeID)
 	
 	volumes, err := vm.client.VolumeList(ctx, volume.ListOptions{})
@@ -111,7 +110,7 @@ func (vm *VolumeManager) ListNodeVolumes(ctx context.Context, nodeID string) ([]
 		return nil, fmt.Errorf("failed to list volumes: %w", err)
 	}
 
-	var nodeVolumes []*types.Volume
+	var nodeVolumes []*volume.Volume
 	for _, v := range volumes.Volumes {
 		for _, name := range volumeNames {
 			if v.Name == name {
