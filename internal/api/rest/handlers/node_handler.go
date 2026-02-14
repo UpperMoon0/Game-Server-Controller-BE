@@ -112,21 +112,18 @@ func (h *NodeHandler) CreateNode(c *gin.Context) {
 		return
 	}
 
+	// Set default port if not provided
+	port := req.Port
+	if port == 0 {
+		port = 8080
+	}
+
 	node := &models.Node{
-		Name:               req.Name,
-		Hostname:           req.Hostname,
-		IPAddress:          req.IPAddress,
-		Port:               req.Port,
-		Status:             models.NodeStatusOffline,
-		GameTypes:          req.GameTypes,
-		TotalCPUCores:      req.TotalCPUCores,
-		TotalMemoryMB:      req.TotalMemoryMB,
-		TotalStorageMB:     req.TotalStorageMB,
-		AvailableCPUCores:  req.TotalCPUCores,
-		AvailableMemoryMB:  req.TotalMemoryMB,
-		AvailableStorageMB: req.TotalStorageMB,
-		OSVersion:         req.OSVersion,
-		HeartbeatInterval:  30,
+		Name:              req.Name,
+		Port:              port,
+		Status:            models.NodeStatusOffline,
+		GameType:          req.GameType,
+		HeartbeatInterval: 30,
 	}
 
 	ctx := c.Request.Context()
@@ -171,8 +168,11 @@ func (h *NodeHandler) UpdateNode(c *gin.Context) {
 	if req.Name != nil {
 		node.Name = *req.Name
 	}
-	if req.GameTypes != nil {
-		node.GameTypes = req.GameTypes
+	if req.Port != nil {
+		node.Port = *req.Port
+	}
+	if req.GameType != nil {
+		node.GameType = *req.GameType
 	}
 	if req.HeartbeatInterval != nil {
 		node.HeartbeatInterval = *req.HeartbeatInterval

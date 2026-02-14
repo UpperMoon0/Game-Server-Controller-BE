@@ -112,7 +112,7 @@ func (m *Manager) RegisterNode(ctx context.Context, node *models.Node) error {
 		
 		m.logger.Info("Node reconnected",
 			zap.String("node_id", node.ID),
-			zap.String("hostname", node.Hostname))
+			zap.String("name", node.Name))
 		return nil
 	}
 
@@ -129,8 +129,8 @@ func (m *Manager) RegisterNode(ctx context.Context, node *models.Node) error {
 
 	m.logger.Info("Node registered",
 		zap.String("node_id", node.ID),
-		zap.String("hostname", node.Hostname),
-		zap.Strings("game_types", node.GameTypes))
+		zap.String("name", node.Name),
+		zap.String("game_type", node.GameType))
 
 	// Update database
 	if err := m.nodeRepo.Create(ctx, node); err != nil {
@@ -443,10 +443,6 @@ func (m *Manager) GetClusterMetrics() (*ClusterMetrics, error) {
 		TotalNodes:     len(m.nodes),
 		OnlineNodes:    0,
 		OfflineNodes:   0,
-		TotalCPUCores:  0,
-		UsedCPUCores:   0,
-		TotalMemoryMB:  0,
-		UsedMemoryMB:   0,
 	}
 
 	for _, state := range m.nodes {
@@ -455,14 +451,6 @@ func (m *Manager) GetClusterMetrics() (*ClusterMetrics, error) {
 		} else {
 			metrics.OfflineNodes++
 		}
-
-		metrics.TotalCPUCores += int64(state.Node.TotalCPUCores)
-		metrics.TotalMemoryMB += state.Node.TotalMemoryMB
-
-		if state.Metrics != nil {
-			metrics.UsedCPUCores += int64(state.Metrics.CPUUsagePercent * float64(state.Node.TotalCPUCores) / 100)
-			metrics.UsedMemoryMB += int64(state.Metrics.MemoryUsagePercent * float64(state.Node.TotalMemoryMB) / 100)
-		}
 	}
 
 	return metrics, nil
@@ -470,13 +458,9 @@ func (m *Manager) GetClusterMetrics() (*ClusterMetrics, error) {
 
 // ClusterMetrics represents aggregated cluster metrics
 type ClusterMetrics struct {
-	TotalNodes    int
-	OnlineNodes   int
-	OfflineNodes  int
-	TotalCPUCores int64
-	UsedCPUCores  int64
-	TotalMemoryMB int64
-	UsedMemoryMB  int64
+	TotalNodes   int
+	OnlineNodes  int
+	OfflineNodes int
 }
 
 // StartHealthCheck starts periodic health checks for all nodes
@@ -511,7 +495,7 @@ func (m *Manager) checkNodeHealth() {
 			state.Node.Status = models.NodeStatusUnhealthy
 			m.logger.Warn("Node heartbeat timeout",
 				zap.String("node_id", state.Node.ID),
-				zap.String("hostname", state.Node.Hostname))
+				zap.String("name", state.Node.Name))
 		}
 	}
 }

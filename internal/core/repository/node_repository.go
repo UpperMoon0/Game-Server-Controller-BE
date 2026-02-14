@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -32,26 +31,16 @@ func (r *NodeRepository) Create(ctx context.Context, node *models.Node) error {
 	node.CreatedAt = time.Now()
 	node.UpdatedAt = time.Now()
 
-	gameTypesJSON, err := json.Marshal(node.GameTypes)
-	if err != nil {
-		return fmt.Errorf("failed to marshal game types: %w", err)
-	}
-
 	query := `
 		INSERT INTO nodes (
-			id, name, hostname, ip_address, port, status, game_types,
-			total_cpu_cores, total_memory_mb, total_storage_mb,
-			available_cpu_cores, available_memory_mb, available_storage_mb,
-			os_version, agent_version, heartbeat_interval, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+			id, name, port, status, game_type,
+			agent_version, heartbeat_interval, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
-	_, err = r.db.ExecContext(ctx, query,
-		node.ID, node.Name, node.Hostname, node.IPAddress, node.Port,
-		node.Status, gameTypesJSON,
-		node.TotalCPUCores, node.TotalMemoryMB, node.TotalStorageMB,
-		node.AvailableCPUCores, node.AvailableMemoryMB, node.AvailableStorageMB,
-		node.OSVersion, node.AgentVersion, node.HeartbeatInterval,
+	_, err := r.db.ExecContext(ctx, query,
+		node.ID, node.Name, node.Port, node.Status, node.GameType,
+		node.AgentVersion, node.HeartbeatInterval,
 		node.CreatedAt, node.UpdatedAt,
 	)
 
@@ -69,24 +58,19 @@ func (r *NodeRepository) Create(ctx context.Context, node *models.Node) error {
 // GetByID retrieves a node by ID
 func (r *NodeRepository) GetByID(ctx context.Context, id string) (*models.Node, error) {
 	query := `
-		SELECT id, name, hostname, ip_address, port, status, game_types,
-			total_cpu_cores, total_memory_mb, total_storage_mb,
-			available_cpu_cores, available_memory_mb, available_storage_mb,
-			os_version, agent_version, heartbeat_interval, last_heartbeat,
+		SELECT id, name, port, status, game_type,
+			agent_version, heartbeat_interval, last_heartbeat,
 			created_at, updated_at
 		FROM nodes WHERE id = $1
 	`
 
 	var node models.Node
-	var gameTypesJSON []byte
 	var lastHeartbeat sql.NullTime
+	var agentVersion sql.NullString
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&node.ID, &node.Name, &node.Hostname, &node.IPAddress, &node.Port,
-		&node.Status, &gameTypesJSON,
-		&node.TotalCPUCores, &node.TotalMemoryMB, &node.TotalStorageMB,
-		&node.AvailableCPUCores, &node.AvailableMemoryMB, &node.AvailableStorageMB,
-		&node.OSVersion, &node.AgentVersion, &node.HeartbeatInterval, &lastHeartbeat,
+		&node.ID, &node.Name, &node.Port, &node.Status, &node.GameType,
+		&agentVersion, &node.HeartbeatInterval, &lastHeartbeat,
 		&node.CreatedAt, &node.UpdatedAt,
 	)
 
@@ -97,8 +81,8 @@ func (r *NodeRepository) GetByID(ctx context.Context, id string) (*models.Node, 
 		return nil, fmt.Errorf("failed to get node: %w", err)
 	}
 
-	if err := json.Unmarshal(gameTypesJSON, &node.GameTypes); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal game types: %w", err)
+	if agentVersion.Valid {
+		node.AgentVersion = agentVersion.String
 	}
 
 	if lastHeartbeat.Valid {
@@ -108,27 +92,22 @@ func (r *NodeRepository) GetByID(ctx context.Context, id string) (*models.Node, 
 	return &node, nil
 }
 
-// GetByHostname retrieves a node by hostname
-func (r *NodeRepository) GetByHostname(ctx context.Context, hostname string) (*models.Node, error) {
+// GetByName retrieves a node by name
+func (r *NodeRepository) GetByName(ctx context.Context, name string) (*models.Node, error) {
 	query := `
-		SELECT id, name, hostname, ip_address, port, status, game_types,
-			total_cpu_cores, total_memory_mb, total_storage_mb,
-			available_cpu_cores, available_memory_mb, available_storage_mb,
-			os_version, agent_version, heartbeat_interval, last_heartbeat,
+		SELECT id, name, port, status, game_type,
+			agent_version, heartbeat_interval, last_heartbeat,
 			created_at, updated_at
-		FROM nodes WHERE hostname = $1
+		FROM nodes WHERE name = $1
 	`
 
 	var node models.Node
-	var gameTypesJSON []byte
 	var lastHeartbeat sql.NullTime
+	var agentVersion sql.NullString
 
-	err := r.db.QueryRowContext(ctx, query, hostname).Scan(
-		&node.ID, &node.Name, &node.Hostname, &node.IPAddress, &node.Port,
-		&node.Status, &gameTypesJSON,
-		&node.TotalCPUCores, &node.TotalMemoryMB, &node.TotalStorageMB,
-		&node.AvailableCPUCores, &node.AvailableMemoryMB, &node.AvailableStorageMB,
-		&node.OSVersion, &node.AgentVersion, &node.HeartbeatInterval, &lastHeartbeat,
+	err := r.db.QueryRowContext(ctx, query, name).Scan(
+		&node.ID, &node.Name, &node.Port, &node.Status, &node.GameType,
+		&agentVersion, &node.HeartbeatInterval, &lastHeartbeat,
 		&node.CreatedAt, &node.UpdatedAt,
 	)
 
@@ -139,8 +118,8 @@ func (r *NodeRepository) GetByHostname(ctx context.Context, hostname string) (*m
 		return nil, fmt.Errorf("failed to get node: %w", err)
 	}
 
-	if err := json.Unmarshal(gameTypesJSON, &node.GameTypes); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal game types: %w", err)
+	if agentVersion.Valid {
+		node.AgentVersion = agentVersion.String
 	}
 
 	if lastHeartbeat.Valid {
@@ -157,20 +136,16 @@ func (r *NodeRepository) List(ctx context.Context, status *models.NodeStatus) ([
 
 	if status != nil {
 		query = `
-			SELECT id, name, hostname, ip_address, port, status, game_types,
-				total_cpu_cores, total_memory_mb, total_storage_mb,
-				available_cpu_cores, available_memory_mb, available_storage_mb,
-				os_version, agent_version, heartbeat_interval, last_heartbeat,
+			SELECT id, name, port, status, game_type,
+				agent_version, heartbeat_interval, last_heartbeat,
 				created_at, updated_at
 			FROM nodes WHERE status = $1 ORDER BY created_at DESC
 		`
 		args = []interface{}{*status}
 	} else {
 		query = `
-			SELECT id, name, hostname, ip_address, port, status, game_types,
-				total_cpu_cores, total_memory_mb, total_storage_mb,
-				available_cpu_cores, available_memory_mb, available_storage_mb,
-				os_version, agent_version, heartbeat_interval, last_heartbeat,
+			SELECT id, name, port, status, game_type,
+				agent_version, heartbeat_interval, last_heartbeat,
 				created_at, updated_at
 			FROM nodes ORDER BY created_at DESC
 		`
@@ -185,22 +160,19 @@ func (r *NodeRepository) List(ctx context.Context, status *models.NodeStatus) ([
 	var nodes []*models.Node
 	for rows.Next() {
 		var node models.Node
-		var gameTypesJSON []byte
 		var lastHeartbeat sql.NullTime
+		var agentVersion sql.NullString
 
 		if err := rows.Scan(
-			&node.ID, &node.Name, &node.Hostname, &node.IPAddress, &node.Port,
-			&node.Status, &gameTypesJSON,
-			&node.TotalCPUCores, &node.TotalMemoryMB, &node.TotalStorageMB,
-			&node.AvailableCPUCores, &node.AvailableMemoryMB, &node.AvailableStorageMB,
-			&node.OSVersion, &node.AgentVersion, &node.HeartbeatInterval, &lastHeartbeat,
+			&node.ID, &node.Name, &node.Port, &node.Status, &node.GameType,
+			&agentVersion, &node.HeartbeatInterval, &lastHeartbeat,
 			&node.CreatedAt, &node.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan node: %w", err)
 		}
 
-		if err := json.Unmarshal(gameTypesJSON, &node.GameTypes); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal game types: %w", err)
+		if agentVersion.Valid {
+			node.AgentVersion = agentVersion.String
 		}
 
 		if lastHeartbeat.Valid {
@@ -219,20 +191,13 @@ func (r *NodeRepository) Update(ctx context.Context, node *models.Node) error {
 
 	query := `
 		UPDATE nodes SET
-			name = $1, status = $2, game_types = $3,
-			available_cpu_cores = $4, available_memory_mb = $5, available_storage_mb = $6,
-			heartbeat_interval = $7, last_heartbeat = $8, updated_at = $9
-		WHERE id = $10
+			name = $1, port = $2, status = $3, game_type = $4,
+			heartbeat_interval = $5, last_heartbeat = $6, updated_at = $7
+		WHERE id = $8
 	`
 
-	gameTypesJSON, err := json.Marshal(node.GameTypes)
-	if err != nil {
-		return fmt.Errorf("failed to marshal game types: %w", err)
-	}
-
-	_, err = r.db.ExecContext(ctx, query,
-		node.Name, node.Status, gameTypesJSON,
-		node.AvailableCPUCores, node.AvailableMemoryMB, node.AvailableStorageMB,
+	_, err := r.db.ExecContext(ctx, query,
+		node.Name, node.Port, node.Status, node.GameType,
 		node.HeartbeatInterval, node.LastHeartbeat, node.UpdatedAt, node.ID,
 	)
 

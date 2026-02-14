@@ -151,8 +151,8 @@ type ServerFilters struct {
 	Status    ServerStatus  `query:"status"`
 	GameType  string        `query:"game_type"`
 	HasPlayer *bool         `query:"has_player"`
-	Limit     int           `query:"limit" binding:"min=1,max=100"`
-	Offset    int           `query:"offset" binding:"min=0"`
+	Limit     int           `query:"limit" binding:"omitempty,min=1,max=100"`
+	Offset    int           `query:"offset" binding:"omitempty,min=0"`
 }
 
 // CreateServerResponse represents the response after creating a server
