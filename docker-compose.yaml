@@ -28,7 +28,7 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "8082:8080"
+      - "8083:8080"
       - "50051:50051"
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
