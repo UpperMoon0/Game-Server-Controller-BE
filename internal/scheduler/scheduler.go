@@ -7,365 +7,111 @@ import (
 
 	"github.com/game-server/controller/internal/core/models"
 	"github.com/game-server/controller/internal/core/repository"
-	"github.com/game-server/controller/internal/node"
+	nodepkg "github.com/game-server/controller/internal/node"
 	"go.uber.org/zap"
 )
 
-// Scheduler handles resource allocation and server lifecycle
+// Scheduler handles resource allocation and node lifecycle
 type Scheduler struct {
-	nodeRepo    *repository.NodeRepository
-	serverRepo  *repository.ServerRepository
-	nodeMgr     *node.Manager
-	logger      *zap.Logger
+	nodeRepo *repository.NodeRepository
+	nodeMgr  *nodepkg.Manager
+	logger   *zap.Logger
 }
 
 // NewScheduler creates a new scheduler
 func NewScheduler(
 	nodeRepo *repository.NodeRepository,
-	serverRepo *repository.ServerRepository,
-	nodeMgr *node.Manager,
+	nodeMgr *nodepkg.Manager,
 	logger *zap.Logger,
 ) *Scheduler {
 	return &Scheduler{
-		nodeRepo:   nodeRepo,
-		serverRepo: serverRepo,
-		nodeMgr:    nodeMgr,
-		logger:     logger,
+		nodeRepo: nodeRepo,
+		nodeMgr:  nodeMgr,
+		logger:   logger,
 	}
 }
 
-// CreateServer creates a new server on the optimal node
-func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRequest) (*models.CreateServerResponse, error) {
-	// Find optimal node for the server
-	targetNode, err := s.FindOptimalNode(req.GameType, &req.Requirements)
+// StartNode starts a node
+func (s *Scheduler) StartNode(ctx context.Context, nodeID string) error {
+	node, err := s.nodeMgr.GetNode(nodeID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find optimal node: %w", err)
-	}
-
-	// Create server configuration
-	server := &models.Server{
-		Name:          req.Config.Name,
-		NodeID:        targetNode.ID,
-		GameType:      req.GameType,
-		Status:        models.ServerStatusInstalling,
-		Version:       req.Config.Version,
-		Settings:      req.Config.Settings,
-		EnvVars:       req.Config.EnvVars,
-		MaxPlayers:    req.Config.MaxPlayers,
-		WorldName:     req.Config.WorldName,
-		OnlineMode:    req.Config.OnlineMode,
-		Port:          0, // Will be assigned by node
-		QueryPort:     0,
-		RCONPort:      0,
-		IPAddress:     "localhost", // Nodes are on the same machine
-		PlayerCount:   0,
-		CPUUsage:      0,
-		MemoryUsage:   0,
-		UptimeSeconds: 0,
-	}
-
-	// Create server in database
-	if err := s.serverRepo.Create(ctx, server); err != nil {
-		return nil, fmt.Errorf("failed to create server: %w", err)
-	}
-
-	// Send create command to node
-	cmd := &node.Command{
-		ID:   generateCommandID(),
-		Type: node.CommandTypeCreateServer,
-		Payload: map[string]interface{}{
-			"server_id":     server.ID,
-			"game_type":    req.GameType,
-			"config":        req.Config,
-			"requirements":  req.Requirements,
-		},
-		Response: make(chan *node.CommandResult, 1),
-	}
-
-	if err := s.nodeMgr.SendCommand(targetNode.ID, cmd); err != nil {
-		s.serverRepo.Delete(ctx, server.ID)
-		return nil, fmt.Errorf("failed to send create command: %w", err)
-	}
-
-	// Wait for result (with timeout)
-	select {
-	case result := <-cmd.Response:
-		if !result.Success {
-			s.serverRepo.Delete(ctx, server.ID)
-			return nil, fmt.Errorf("failed to create server on node: %s", result.Message)
-		}
-	case <-time.After(60 * time.Second):
-		return nil, fmt.Errorf("timeout waiting for server creation")
-	}
-
-	s.logger.Info("Server created",
-		zap.String("server_id", server.ID),
-		zap.String("node_id", targetNode.ID),
-		zap.String("game_type", req.GameType))
-
-	return &models.CreateServerResponse{
-		Success:   true,
-		ServerID:  server.ID,
-		Message:   "Server created successfully",
-		ServerInfo: &models.ServerInfo{
-			ServerID:  server.ID,
-			NodeID:    targetNode.ID,
-			Port:      server.Port,
-			IPAddress: server.IPAddress,
-		},
-	}, nil
-}
-
-// UpdateServer updates server configuration
-func (s *Scheduler) UpdateServer(ctx context.Context, serverID string, req models.UpdateServerRequest) error {
-	server, err := s.serverRepo.GetByID(ctx, serverID)
-	if err != nil {
-		return fmt.Errorf("server not found: %w", err)
-	}
-
-	// Update server fields
-	if req.Config != nil {
-		server.Name = req.Config.Name
-		server.Version = req.Config.Version
-		server.Settings = req.Config.Settings
-		server.EnvVars = req.Config.EnvVars
-		server.MaxPlayers = req.Config.MaxPlayers
-		server.WorldName = req.Config.WorldName
-		server.OnlineMode = req.Config.OnlineMode
-	}
-
-	// Save to database
-	if err := s.serverRepo.Update(ctx, server); err != nil {
-		return fmt.Errorf("failed to update server: %w", err)
-	}
-
-	// Send update command to node if server is running
-	if server.Status == models.ServerStatusRunning && req.Restart {
-		return s.RestartServer(ctx, serverID)
-	}
-
-	return nil
-}
-
-// DeleteServer deletes a server
-func (s *Scheduler) DeleteServer(ctx context.Context, serverID string, backup bool) error {
-	server, err := s.serverRepo.GetByID(ctx, serverID)
-	if err != nil {
-		return fmt.Errorf("server not found: %w", err)
-	}
-
-	// Send delete command to node
-	cmd := &node.Command{
-		ID:   generateCommandID(),
-		Type: node.CommandTypeDeleteServer,
-		Payload: map[string]interface{}{
-			"server_id":         serverID,
-			"backup_before_delete": backup,
-		},
-		Response: make(chan *node.CommandResult, 1),
-	}
-
-	if err := s.nodeMgr.SendCommand(server.NodeID, cmd); err != nil {
-		s.logger.Error("Failed to send delete command", zap.Error(err))
-	}
-
-	// Delete from database
-	if err := s.serverRepo.Delete(ctx, serverID); err != nil {
-		s.logger.Error("Failed to delete server from database", zap.Error(err))
-	}
-
-	s.logger.Info("Server deleted", zap.String("server_id", serverID))
-
-	return nil
-}
-
-// StartServer starts a server
-func (s *Scheduler) StartServer(ctx context.Context, serverID string) error {
-	server, err := s.serverRepo.GetByID(ctx, serverID)
-	if err != nil {
-		return fmt.Errorf("server not found: %w", err)
+		return fmt.Errorf("node not found: %w", err)
 	}
 
 	// Update status
-	if err := s.serverRepo.UpdateStatus(ctx, serverID, models.ServerStatusStarting); err != nil {
+	node.Status = models.NodeStatusStarting
+	if err := s.nodeRepo.Update(ctx, node); err != nil {
 		return fmt.Errorf("failed to update status: %w", err)
 	}
 
 	// Send start command to node
-	cmd := &node.Command{
+	cmd := &nodepkg.Command{
 		ID:   generateCommandID(),
-		Type: node.CommandTypeStartServer,
+		Type: nodepkg.CommandTypeStart,
 		Payload: map[string]interface{}{
-			"server_id": serverID,
+			"node_id": nodeID,
 		},
-		Response: make(chan *node.CommandResult, 1),
+		Response: make(chan *nodepkg.CommandResult, 1),
 	}
 
-	if err := s.nodeMgr.SendCommand(server.NodeID, cmd); err != nil {
-		s.serverRepo.UpdateStatus(ctx, serverID, models.ServerStatusStopped)
+	if err := s.nodeMgr.SendCommand(nodeID, cmd); err != nil {
+		node.Status = models.NodeStatusStopped
+		s.nodeRepo.Update(ctx, node)
 		return fmt.Errorf("failed to send start command: %w", err)
 	}
 
 	return nil
 }
 
-// StopServer stops a server
-func (s *Scheduler) StopServer(ctx context.Context, serverID string) error {
-	server, err := s.serverRepo.GetByID(ctx, serverID)
+// StopNode stops a node
+func (s *Scheduler) StopNode(ctx context.Context, nodeID string) error {
+	node, err := s.nodeMgr.GetNode(nodeID)
 	if err != nil {
-		return fmt.Errorf("server not found: %w", err)
+		return fmt.Errorf("node not found: %w", err)
 	}
 
 	// Update status
-	if err := s.serverRepo.UpdateStatus(ctx, serverID, models.ServerStatusStopping); err != nil {
+	node.Status = models.NodeStatusStopping
+	if err := s.nodeRepo.Update(ctx, node); err != nil {
 		return fmt.Errorf("failed to update status: %w", err)
 	}
 
 	// Send stop command to node
-	cmd := &node.Command{
+	cmd := &nodepkg.Command{
 		ID:   generateCommandID(),
-		Type: node.CommandTypeStopServer,
+		Type: nodepkg.CommandTypeStop,
 		Payload: map[string]interface{}{
-			"server_id": serverID,
+			"node_id": nodeID,
 		},
-		Response: make(chan *node.CommandResult, 1),
+		Response: make(chan *nodepkg.CommandResult, 1),
 	}
 
-	if err := s.nodeMgr.SendCommand(server.NodeID, cmd); err != nil {
-		s.serverRepo.UpdateStatus(ctx, serverID, models.ServerStatusRunning)
+	if err := s.nodeMgr.SendCommand(nodeID, cmd); err != nil {
+		node.Status = models.NodeStatusRunning
+		s.nodeRepo.Update(ctx, node)
 		return fmt.Errorf("failed to send stop command: %w", err)
 	}
 
 	return nil
 }
 
-// RestartServer restarts a server
-func (s *Scheduler) RestartServer(ctx context.Context, serverID string) error {
+// RestartNode restarts a node
+func (s *Scheduler) RestartNode(ctx context.Context, nodeID string) error {
 	// Stop then start
-	if err := s.StopServer(ctx, serverID); err != nil {
+	if err := s.StopNode(ctx, nodeID); err != nil {
 		return err
 	}
 
 	// Wait for stop
 	time.Sleep(5 * time.Second)
 
-	return s.StartServer(ctx, serverID)
+	return s.StartNode(ctx, nodeID)
 }
 
-// ReinstallServer reinstalls a server
-func (s *Scheduler) ReinstallServer(ctx context.Context, serverID string) error {
-	server, err := s.serverRepo.GetByID(ctx, serverID)
-	if err != nil {
-		return fmt.Errorf("server not found: %w", err)
-	}
-
-	// Update status
-	if err := s.serverRepo.UpdateStatus(ctx, serverID, models.ServerStatusInstalling); err != nil {
-		return fmt.Errorf("failed to update status: %w", err)
-	}
-
-	// Send reinstall command
-	cmd := &node.Command{
-		ID:   generateCommandID(),
-		Type: node.CommandTypeDeleteServer,
-		Payload: map[string]interface{}{
-			"server_id":     serverID,
-			"reinstall":     true,
-			"backup_first": true,
-		},
-		Response: make(chan *node.CommandResult, 1),
-	}
-
-	if err := s.nodeMgr.SendCommand(server.NodeID, cmd); err != nil {
-		return fmt.Errorf("failed to send reinstall command: %w", err)
-	}
-
-	return nil
-}
-
-// BackupServer backs up a server
-func (s *Scheduler) BackupServer(ctx context.Context, serverID string) error {
-	_, err := s.serverRepo.GetByID(ctx, serverID)
-	if err != nil {
-		return fmt.Errorf("server not found: %w", err)
-	}
-
-	// Update status
-	if err := s.serverRepo.UpdateStatus(ctx, serverID, models.ServerStatusBackingUp); err != nil {
-		return fmt.Errorf("failed to update status: %w", err)
-	}
-
-	// Send backup command (placeholder)
-
-	return nil
-}
-
-// FindOptimalNode finds the best node for a server
-func (s *Scheduler) FindOptimalNode(gameType string, requirements *models.ResourceRequirements) (*models.Node, error) {
-	nodes, err := s.nodeMgr.ListNodes()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list nodes: %w", err)
-	}
-
-	// Filter by game type and status
-	filtered := make([]*models.Node, 0)
-	for _, n := range nodes {
-		if n.Status != models.NodeStatusOnline {
-			continue
-		}
-		if n.GameType != gameType {
-			continue
-		}
-		filtered = append(filtered, n)
-	}
-
-	if len(filtered) == 0 {
-		return nil, fmt.Errorf("no suitable node found for game type: %s", gameType)
-	}
-
-	// Return the first available node (simplified - no resource tracking)
-	return filtered[0], nil
-}
-
-// AllocateResources is a no-op since we removed resource tracking
-func (s *Scheduler) AllocateResources(nodeID string, requirements *models.ResourceRequirements) error {
-	// No-op - resource tracking removed
-	return nil
-}
-
-// ReleaseResources is a no-op since we removed resource tracking
-func (s *Scheduler) ReleaseResources(nodeID string, requirements *models.ResourceRequirements) {
-	// No-op - resource tracking removed
-}
-
-// GetServer retrieves a server by ID
-func (s *Scheduler) GetServer(serverID string) (*models.Server, error) {
+// GetNodeCounts returns node counts by status
+func (s *Scheduler) GetNodeCounts() (map[models.NodeStatus]int, error) {
 	ctx := context.Background()
-	return s.serverRepo.GetByID(ctx, serverID)
-}
-
-// ListServers lists all servers
-func (s *Scheduler) ListServers(filters *models.ServerFilters) ([]*models.Server, error) {
-	ctx := context.Background()
-	return s.serverRepo.List(ctx, filters)
-}
-
-// GetServerLogs gets server logs
-func (s *Scheduler) GetServerLogs(serverID string, tail int) ([]string, error) {
-	// Implementation placeholder
-	return []string{}, nil
-}
-
-// GetServerMetrics gets server metrics
-func (s *Scheduler) GetServerMetrics(serverID string) (*models.ServerMetrics, error) {
-	// Implementation placeholder
-	return nil, fmt.Errorf("metrics not available")
-}
-
-// GetServerCounts returns server counts by status
-func (s *Scheduler) GetServerCounts() (map[models.ServerStatus]int, error) {
-	ctx := context.Background()
-	return s.serverRepo.CountByStatus(ctx)
+	return s.nodeRepo.CountByStatus(ctx)
 }
 
 // Helper functions

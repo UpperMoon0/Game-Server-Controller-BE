@@ -82,13 +82,12 @@ func main() {
 
 	// Initialize repositories
 	nodeRepo := repository.NewNodeRepository(db, log)
-	serverRepo := repository.NewServerRepository(db, log)
 
 	// Initialize node manager
-	nodeMgr := node.NewManager(nodeRepo, serverRepo, volumeMgr, containerMgr, cfg, log)
+	nodeMgr := node.NewManager(nodeRepo, volumeMgr, containerMgr, cfg, log)
 
 	// Initialize scheduler
-	sched := scheduler.NewScheduler(nodeRepo, serverRepo, nodeMgr, log)
+	sched := scheduler.NewScheduler(nodeRepo, nodeMgr, log)
 
 	// Initialize gRPC server
 	grpcServer, err := server.NewGRPCServer(cfg, nodeMgr, sched, log)
@@ -97,7 +96,7 @@ func main() {
 	}
 
 	// Initialize REST API server
-	restServer := rest.NewServer(cfg, nodeMgr, serverRepo, sched, containerMgr, log)
+	restServer := rest.NewServer(cfg, nodeMgr, sched, containerMgr, log)
 
 	// Start gRPC server
 	go func() {

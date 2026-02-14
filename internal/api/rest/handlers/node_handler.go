@@ -87,7 +87,7 @@ func (h *NodeHandler) ListNodes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"nodes":      nodes,
 		"total":      len(nodes),
-		"online":     countNodesByStatus(nodes, models.NodeStatusOnline),
+		"online":     countNodesByStatus(nodes, models.NodeStatusRunning),
 		"offline":    countNodesByStatus(nodes, models.NodeStatusOffline),
 	})
 }

@@ -11,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/game-server/controller/internal/api/rest/handlers"
-	"github.com/game-server/controller/internal/core/repository"
 	"github.com/game-server/controller/internal/docker"
 	"github.com/game-server/controller/internal/node"
 	"github.com/game-server/controller/internal/scheduler"
@@ -24,8 +23,7 @@ type Server struct {
 	router       *gin.Engine
 	httpServer   *http.Server
 	cfg          *config.Config
-	nodeRepo     *node.Manager
-	serverRepo   *repository.ServerRepository
+	nodeMgr      *node.Manager
 	scheduler    *scheduler.Scheduler
 	containerMgr *docker.ContainerManager
 	logger       *zap.Logger
@@ -34,8 +32,7 @@ type Server struct {
 // NewServer creates a new REST API server
 func NewServer(
 	cfg *config.Config,
-	nodeRepo *node.Manager,
-	serverRepo *repository.ServerRepository,
+	nodeMgr *node.Manager,
 	scheduler *scheduler.Scheduler,
 	containerMgr *docker.ContainerManager,
 	logger *zap.Logger,
@@ -53,8 +50,7 @@ func NewServer(
 	return &Server{
 		router:       router,
 		cfg:          cfg,
-		nodeRepo:     nodeRepo,
-		serverRepo:   serverRepo,
+		nodeMgr:      nodeMgr,
 		scheduler:    scheduler,
 		containerMgr: containerMgr,
 		logger:       logger,
@@ -112,12 +108,8 @@ func (s *Server) registerRoutes() {
 	v1 := s.router.Group("/api/v1")
 	{
 		// Register node handler
-		nodeHandler := handlers.NewNodeHandler(s.nodeRepo, s.scheduler, s.containerMgr, s.cfg, s.logger)
+		nodeHandler := handlers.NewNodeHandler(s.nodeMgr, s.scheduler, s.containerMgr, s.cfg, s.logger)
 		nodeHandler.RegisterRoutes(v1)
-
-		// Register server handler
-		serverHandler := handlers.NewServerHandler(s.nodeRepo, s.scheduler, s.logger)
-		serverHandler.RegisterRoutes(v1)
 
 		// Metrics endpoint
 		v1.GET("/metrics", s.getClusterMetrics)
@@ -137,8 +129,8 @@ func (s *Server) healthCheck(c *gin.Context) {
 }
 
 func (s *Server) readinessCheck(c *gin.Context) {
-	// Check if database is accessible
-	_, err := s.serverRepo.CountByStatus(c.Request.Context())
+	// Check if we can list nodes (verifies database connection)
+	_, err := s.nodeMgr.ListNodes()
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status":  "not ready",
@@ -155,7 +147,7 @@ func (s *Server) readinessCheck(c *gin.Context) {
 
 func (s *Server) getClusterMetrics(c *gin.Context) {
 	// Get cluster metrics from node manager
-	clusterMetrics, err := s.nodeRepo.GetClusterMetrics()
+	clusterMetrics, err := s.nodeMgr.GetClusterMetrics()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to get cluster metrics",
@@ -164,19 +156,19 @@ func (s *Server) getClusterMetrics(c *gin.Context) {
 		return
 	}
 
-	// Get server counts
-	serverCounts, err := s.scheduler.GetServerCounts()
+	// Get node counts by status
+	nodeCounts, err := s.scheduler.GetNodeCounts()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to get server counts",
+			"error":   "Failed to get node counts",
 			"message": err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"nodes":   clusterMetrics,
-		"servers": serverCounts,
+		"nodes":     clusterMetrics,
+		"node_counts": nodeCounts,
 		"timestamp": time.Now().UTC(),
 	})
 }
@@ -241,7 +233,7 @@ func CORSMiddleware() gin.HandlerFunc {
 
 // RunServer starts the REST API server (standalone function for testing)
 func RunServer(cfg *config.Config, logger *zap.Logger) error {
-	server := NewServer(nil, nil, nil, nil, nil, logger)
+	server := NewServer(nil, nil, nil, nil, logger)
 	
 	if err := server.Start(); err != nil {
 		return err

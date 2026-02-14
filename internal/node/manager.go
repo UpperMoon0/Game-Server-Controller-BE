@@ -16,7 +16,6 @@ import (
 // Manager handles node lifecycle and communication
 type Manager struct {
 	nodeRepo      *repository.NodeRepository
-	serverRepo    *repository.ServerRepository
 	volumeMgr     *docker.VolumeManager
 	containerMgr  *docker.ContainerManager
 	cfg           *config.Config
@@ -50,12 +49,9 @@ type Command struct {
 type CommandType string
 
 const (
-	CommandTypeCreateServer  CommandType = "create_server"
-	CommandTypeUpdateServer  CommandType = "update_server"
-	CommandTypeDeleteServer  CommandType = "delete_server"
-	CommandTypeStartServer   CommandType = "start_server"
-	CommandTypeStopServer    CommandType = "stop_server"
-	CommandTypeRestartServer CommandType = "restart_server"
+	CommandTypeStart   CommandType = "start"
+	CommandTypeStop    CommandType = "stop"
+	CommandTypeRestart CommandType = "restart"
 )
 
 // CommandResult represents the result of a command
@@ -76,7 +72,6 @@ type StreamEvent struct {
 // NewManager creates a new node manager
 func NewManager(
 	nodeRepo *repository.NodeRepository,
-	serverRepo *repository.ServerRepository,
 	volumeMgr *docker.VolumeManager,
 	containerMgr *docker.ContainerManager,
 	cfg *config.Config,
@@ -84,7 +79,6 @@ func NewManager(
 ) *Manager {
 	return &Manager{
 		nodeRepo:     nodeRepo,
-		serverRepo:   serverRepo,
 		volumeMgr:    volumeMgr,
 		containerMgr: containerMgr,
 		cfg:          cfg,
@@ -139,8 +133,8 @@ func (m *Manager) RegisterNode(ctx context.Context, node *models.Node) error {
 			return fmt.Errorf("failed to create node in database: %w", err)
 		}
 	} else {
-		// Update status to online in database
-		node.Status = models.NodeStatusOnline
+		// Update status to running in database
+		node.Status = models.NodeStatusRunning
 		if err := m.nodeRepo.Update(ctx, node); err != nil {
 			m.logger.Error("Failed to update node status", zap.Error(err))
 		}
@@ -191,7 +185,7 @@ func (m *Manager) UnregisterNode(ctx context.Context, nodeID string) error {
 	return nil
 }
 
-// DeleteNode permanently deletes a node and all its servers
+// DeleteNode permanently deletes a node
 func (m *Manager) DeleteNode(ctx context.Context, nodeID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -212,18 +206,6 @@ func (m *Manager) DeleteNode(ctx context.Context, nodeID string) error {
 		close(state.CommandQueue)
 		// Remove from registry
 		delete(m.nodes, nodeID)
-	}
-
-	// Delete servers from database (cascade will handle this, but we do it explicitly for logging)
-	serverCount, err := m.serverRepo.DeleteByNodeID(ctx, nodeID)
-	if err != nil {
-		m.logger.Warn("Failed to delete servers, relying on cascade", 
-			zap.Error(err),
-			zap.String("node_id", nodeID))
-	} else {
-		m.logger.Info("Deleted servers for node",
-			zap.String("node_id", nodeID),
-			zap.Int("server_count", serverCount))
 	}
 
 	// Delete node from database
@@ -479,7 +461,7 @@ func (m *Manager) GetClusterMetrics() (*ClusterMetrics, error) {
 	}
 
 	for _, state := range m.nodes {
-		if state.Node.Status == models.NodeStatusOnline {
+		if state.Node.Status == models.NodeStatusRunning {
 			metrics.OnlineNodes++
 		} else {
 			metrics.OfflineNodes++
@@ -525,7 +507,7 @@ func (m *Manager) checkNodeHealth() {
 		}
 
 		if now.Sub(state.LastHeartbeat) > timeout {
-			state.Node.Status = models.NodeStatusUnhealthy
+			state.Node.Status = models.NodeStatusError
 			m.logger.Warn("Node heartbeat timeout",
 				zap.String("node_id", state.Node.ID),
 				zap.String("name", state.Node.Name))
