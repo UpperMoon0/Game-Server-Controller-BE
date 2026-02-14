@@ -116,15 +116,17 @@ jobs:
 
       - name: Extract image tag
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: extract_tag
         run: |
           TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
           echo "IMAGE_TAG=$(basename $TAG)" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$(basename $TAG)" >> $GITHUB_OUTPUT
 
       - name: Trigger main repo deployment
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ steps.kv.outputs.GH_PAT }}
-          repository: UpperMoon0/Game-Server-Controller-BE
+          repository: UpperMoon0/Game-Server
           event-type: controller-be-pushed
-          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}", "image_tag": "${{ env.IMAGE_TAG }}"}'
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}", "image_tag": "${{ steps.extract_tag.outputs.IMAGE_TAG }}"}'
