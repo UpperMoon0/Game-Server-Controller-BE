@@ -36,9 +36,12 @@ jobs:
         VPS_USER=$(az keyvault secret show --vault-name nstutcommonkv --name vps-username --query value -o tsv)
         VPS_PASS=$(az keyvault secret show --vault-name nstutcommonkv --name vps-password --query value -o tsv)
         
-        DB_HOST=$(az keyvault secret show --vault-name nstutcommonkv --name db-host --query value -o tsv)
+        DB_URL=$(az keyvault secret show --vault-name nstutcommonkv --name db-url --query value -o tsv)
         DB_USERNAME=$(az keyvault secret show --vault-name nstutcommonkv --name db-username --query value -o tsv)
         DB_PASSWORD=$(az keyvault secret show --vault-name nstutcommonkv --name db-password --query value -o tsv)
+
+        # Parse JDBC URL: jdbc:postgresql://host:port -> host:port
+        DB_HOST=$(echo "$DB_URL" | sed 's|jdbc:postgresql://||')
 
         echo "::add-mask::$VPS_HOST"
         echo "::add-mask::$VPS_USER"
