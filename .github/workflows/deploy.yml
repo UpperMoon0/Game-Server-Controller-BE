@@ -77,16 +77,27 @@ jobs:
         password: ${{ steps.kv.outputs.VPS_PASSWORD }}
         port: 22
         timeout: 120s
-        env: DB_URL,DB_USERNAME,DB_PASSWORD
+        envs: DB_URL,DB_USERNAME,DB_PASSWORD
         script: |
           mkdir -p /root/game-server-controller-be
           cd /root/game-server-controller-be
 
+          # Parse DATABASE_URL to extract components
+          # Expected format: postgresql://user:password@host:port/database
+          DB_HOST=$(echo "${DB_URL}" | sed -n 's/.*@\([^:]*\):.*/\1/p')
+          DB_PORT=$(echo "${DB_URL}" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
+          DB_NAME=$(echo "${DB_URL}" | sed -n 's/.*\/\([^?]*\)$/\1/p')
+
           # Create .env file from secrets
           echo "ENVIRONMENT=production" > .env
-          echo "DATABASE_URL=${DB_URL}" >> .env
+          echo "DATABASE_HOST=${DB_HOST}" >> .env
+          echo "DATABASE_PORT=${DB_PORT}" >> .env
+          echo "DATABASE_NAME=${DB_NAME}" >> .env
           echo "DATABASE_USER=${DB_USERNAME}" >> .env
           echo "DATABASE_PASSWORD=${DB_PASSWORD}" >> .env
+
+          # Stop existing containers to free up ports
+          docker compose down || true
 
           docker pull nstut/game-server-controller-be:${{ github.event.inputs.image_tag || 'latest' }}
           docker compose -f docker-compose.yaml up -d --remove-orphans
