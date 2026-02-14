@@ -42,11 +42,6 @@ func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRe
 		return nil, fmt.Errorf("failed to find optimal node: %w", err)
 	}
 
-	// Allocate resources
-	if err := s.AllocateResources(targetNode.ID, &req.Requirements); err != nil {
-		return nil, fmt.Errorf("failed to allocate resources: %w", err)
-	}
-
 	// Create server configuration
 	server := &models.Server{
 		Name:          req.Config.Name,
@@ -62,7 +57,7 @@ func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRe
 		Port:          0, // Will be assigned by node
 		QueryPort:     0,
 		RCONPort:      0,
-		IPAddress:     targetNode.IPAddress,
+		IPAddress:     "localhost", // Nodes are on the same machine
 		PlayerCount:   0,
 		CPUUsage:      0,
 		MemoryUsage:   0,
@@ -71,7 +66,6 @@ func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRe
 
 	// Create server in database
 	if err := s.serverRepo.Create(ctx, server); err != nil {
-		s.ReleaseResources(targetNode.ID, &req.Requirements)
 		return nil, fmt.Errorf("failed to create server: %w", err)
 	}
 
@@ -90,7 +84,6 @@ func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRe
 
 	if err := s.nodeMgr.SendCommand(targetNode.ID, cmd); err != nil {
 		s.serverRepo.Delete(ctx, server.ID)
-		s.ReleaseResources(targetNode.ID, &req.Requirements)
 		return nil, fmt.Errorf("failed to send create command: %w", err)
 	}
 
@@ -99,7 +92,6 @@ func (s *Scheduler) CreateServer(ctx context.Context, req *models.CreateServerRe
 	case result := <-cmd.Response:
 		if !result.Success {
 			s.serverRepo.Delete(ctx, server.ID)
-			s.ReleaseResources(targetNode.ID, &req.Requirements)
 			return nil, fmt.Errorf("failed to create server on node: %s", result.Message)
 		}
 	case <-time.After(60 * time.Second):
@@ -181,14 +173,6 @@ func (s *Scheduler) DeleteServer(ctx context.Context, serverID string, backup bo
 	if err := s.serverRepo.Delete(ctx, serverID); err != nil {
 		s.logger.Error("Failed to delete server from database", zap.Error(err))
 	}
-
-	// Release resources
-	requirements := &models.ResourceRequirements{
-		MinCPUCores:  1,
-		MinMemoryMB:  1024,
-		MinStorageMB: 1024,
-	}
-	s.ReleaseResources(server.NodeID, requirements)
 
 	s.logger.Info("Server deleted", zap.String("server_id", serverID))
 
@@ -323,19 +307,13 @@ func (s *Scheduler) FindOptimalNode(gameType string, requirements *models.Resour
 		return nil, fmt.Errorf("failed to list nodes: %w", err)
 	}
 
-	// Filter by game type
+	// Filter by game type and status
 	filtered := make([]*models.Node, 0)
 	for _, n := range nodes {
 		if n.Status != models.NodeStatusOnline {
 			continue
 		}
-		if !containsGameType(n.GameTypes, gameType) {
-			continue
-		}
-		if n.AvailableCPUCores < requirements.MinCPUCores {
-			continue
-		}
-		if n.AvailableMemoryMB < requirements.MinMemoryMB {
+		if n.GameType != gameType {
 			continue
 		}
 		filtered = append(filtered, n)
@@ -345,60 +323,19 @@ func (s *Scheduler) FindOptimalNode(gameType string, requirements *models.Resour
 		return nil, fmt.Errorf("no suitable node found for game type: %s", gameType)
 	}
 
-	// Select node with best resource utilization
-	bestNode := filtered[0]
-	bestScore := calculateNodeScore(bestNode, requirements)
-
-	for _, n := range filtered[1:] {
-		score := calculateNodeScore(n, requirements)
-		if score < bestScore {
-			bestScore = score
-			bestNode = n
-		}
-	}
-
-	return bestNode, nil
+	// Return the first available node (simplified - no resource tracking)
+	return filtered[0], nil
 }
 
-// AllocateResources allocates resources on a node
+// AllocateResources is a no-op since we removed resource tracking
 func (s *Scheduler) AllocateResources(nodeID string, requirements *models.ResourceRequirements) error {
-	node, err := s.nodeMgr.GetNode(nodeID)
-	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
-	}
-
-	// Update available resources
-	node.AvailableCPUCores -= requirements.MinCPUCores
-	node.AvailableMemoryMB -= requirements.MinMemoryMB
-	node.AvailableStorageMB -= requirements.MinStorageMB
-
-	// Update node in database
-	ctx := context.Background()
-	if err := s.nodeRepo.Update(ctx, node); err != nil {
-		return fmt.Errorf("failed to update node: %w", err)
-	}
-
+	// No-op - resource tracking removed
 	return nil
 }
 
-// ReleaseResources releases resources on a node
+// ReleaseResources is a no-op since we removed resource tracking
 func (s *Scheduler) ReleaseResources(nodeID string, requirements *models.ResourceRequirements) {
-	node, err := s.nodeMgr.GetNode(nodeID)
-	if err != nil {
-		s.logger.Error("Failed to release resources", zap.Error(err))
-		return
-	}
-
-	// Update available resources
-	node.AvailableCPUCores += requirements.MinCPUCores
-	node.AvailableMemoryMB += requirements.MinMemoryMB
-	node.AvailableStorageMB += requirements.MinStorageMB
-
-	// Update node in database
-	ctx := context.Background()
-	if err := s.nodeRepo.Update(ctx, node); err != nil {
-		s.logger.Error("Failed to release resources", zap.Error(err))
-	}
+	// No-op - resource tracking removed
 }
 
 // GetServer retrieves a server by ID
@@ -435,22 +372,4 @@ func (s *Scheduler) GetServerCounts() (map[models.ServerStatus]int, error) {
 
 func generateCommandID() string {
 	return fmt.Sprintf("cmd-%d", time.Now().UnixNano())
-}
-
-func containsGameType(gameTypes []string, gameType string) bool {
-	for _, gt := range gameTypes {
-		if gt == gameType {
-			return true
-		}
-	}
-	return false
-}
-
-func calculateNodeScore(node *models.Node, requirements *models.ResourceRequirements) float64 {
-	// Lower score is better
-	cpuScore := float64(node.AvailableCPUCores - requirements.MinCPUCores)
-	memoryScore := float64(node.AvailableMemoryMB - requirements.MinMemoryMB)
-	storageScore := float64(node.AvailableStorageMB - requirements.MinStorageMB)
-
-	return cpuScore + memoryScore + storageScore
 }
