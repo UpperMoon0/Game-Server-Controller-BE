@@ -32,7 +32,6 @@ services:
       - "50051:50051"
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - DATABASE_TYPE=${DATABASE_TYPE:-postgres}
       - DATABASE_HOST=${DATABASE_HOST}
       - DATABASE_USER=${DATABASE_USER}
       - DATABASE_PASSWORD=${DATABASE_PASSWORD}

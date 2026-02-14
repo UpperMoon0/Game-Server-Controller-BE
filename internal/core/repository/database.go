@@ -7,7 +7,6 @@ import (
 
 	"github.com/game-server/controller/pkg/config"
 	_ "github.com/lib/pq" // PostgreSQL driver
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"go.uber.org/zap"
 )
 
@@ -19,23 +18,8 @@ type Database struct {
 
 // NewDatabase creates a new database connection
 func NewDatabase(cfg *config.Config) (*Database, error) {
-	var db *sql.DB
-	var err error
-
-	switch cfg.DatabaseType {
-	case "sqlite":
-		db, err = sql.Open("sqlite3", cfg.DatabaseHost)
-	case "postgresql":
-		dsn := fmt.Sprintf(
-			"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-			cfg.DatabaseHost, cfg.DatabasePort, cfg.DatabaseUser,
-			cfg.DatabasePassword, cfg.DatabaseName, cfg.DatabaseSSLMode,
-		)
-		db, err = sql.Open("postgres", dsn)
-	default:
-		return nil, fmt.Errorf("unsupported database type: %s", cfg.DatabaseType)
-	}
-
+	dsn := cfg.GetDatabaseDSN()
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}

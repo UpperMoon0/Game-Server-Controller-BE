@@ -17,34 +17,33 @@ type Config struct {
 	GRPCPort    int    `mapstructure:"GRPC_PORT"`
 	Environment string `mapstructure:"ENVIRONMENT"`
 
-	// Database Configuration
-	DatabaseType     string `mapstructure:"DATABASE_TYPE"`
+	// Database Configuration (PostgreSQL only)
 	DatabaseHost     string `mapstructure:"DATABASE_HOST"` // Format: "host:port" or just "host" (default port 5432)
 	DatabaseName     string `mapstructure:"DATABASE_NAME"`
 	DatabaseUser     string `mapstructure:"DATABASE_USER"`
 	DatabasePassword string `mapstructure:"DATABASE_PASSWORD"`
 	DatabaseSSLMode  string `mapstructure:"DATABASE_SSL_MODE"`
-	
+
 	// Redis Configuration
 	RedisHost     string `mapstructure:"REDIS_HOST"`
 	RedisPort     int    `mapstructure:"REDIS_PORT"`
 	RedisPassword string `mapstructure:"REDIS_PASSWORD"`
 	RedisDB       int    `mapstructure:"REDIS_DB"`
-	
+
 	// Node Configuration
 	DefaultHeartbeatInterval int `mapstructure:"DEFAULT_HEARTBEAT_INTERVAL"`
 	NodeTimeout              int `mapstructure:"NODE_TIMEOUT"`
-	
+
 	// Metrics Configuration
 	MetricsEnabled       bool   `mapstructure:"METRICS_ENABLED"`
 	MetricsInterval      int    `mapstructure:"METRICS_INTERVAL"`
-	MetricsRetentionDays  int    `mapstructure:"METRICS_RETENTION_DAYS"`
-	
+	MetricsRetentionDays  int   `mapstructure:"METRICS_RETENTION_DAYS"`
+
 	// Logging Configuration
 	LogLevel    string `mapstructure:"LOG_LEVEL"`
 	LogFormat   string `mapstructure:"LOG_FORMAT"`
 	LogFilePath string `mapstructure:"LOG_FILE_PATH"`
-	
+
 	// Clustering
 	ClusterEnabled    bool   `mapstructure:"CLUSTER_ENABLED"`
 	ClusterNodeID    string `mapstructure:"CLUSTER_NODE_ID"`
@@ -61,7 +60,6 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("GRPC_HOST", "0.0.0.0")
 	v.SetDefault("GRPC_PORT", 50051)
 	v.SetDefault("ENVIRONMENT", "development")
-	v.SetDefault("DATABASE_TYPE", "sqlite")
 	v.SetDefault("DATABASE_HOST", "localhost:5432")
 	v.SetDefault("DATABASE_NAME", "game_server")
 	v.SetDefault("DATABASE_SSL_MODE", "disable")
@@ -116,13 +114,8 @@ func (c *Config) GetGRPCAddress() string {
 	return fmt.Sprintf("%s:%d", c.GRPCHost, c.GRPCPort)
 }
 
-// GetDatabaseDSN returns the database connection string
+// GetDatabaseDSN returns the PostgreSQL connection string
 func (c *Config) GetDatabaseDSN() string {
-	if c.DatabaseType == "sqlite" {
-		return c.DatabaseHost // This is actually the file path for sqlite
-	}
-
-	// Parse host:port from DatabaseHost
 	host, port := c.parseHostPort()
 	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		host, port, c.DatabaseUser, c.DatabasePassword, c.DatabaseName, c.DatabaseSSLMode)
