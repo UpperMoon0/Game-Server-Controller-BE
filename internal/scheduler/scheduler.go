@@ -340,32 +340,32 @@ func (s *Scheduler) ReleaseResources(nodeID string, requirements *models.Resourc
 
 // GetServer retrieves a server by ID
 func (s *Scheduler) GetServer(serverID string) (*models.Server, error) {
-	// Implementation placeholder
-	return nil, fmt.Errorf("not implemented")
+	ctx := context.Background()
+	return s.serverRepo.GetByID(ctx, serverID)
 }
 
 // ListServers lists all servers
 func (s *Scheduler) ListServers(filters *models.ServerFilters) ([]*models.Server, error) {
-	// Implementation placeholder
-	return nil, fmt.Errorf("not implemented")
+	ctx := context.Background()
+	return s.serverRepo.List(ctx, filters)
 }
 
 // GetServerLogs gets server logs
 func (s *Scheduler) GetServerLogs(serverID string, tail int) ([]string, error) {
 	// Implementation placeholder
-	return nil, fmt.Errorf("not implemented")
+	return []string{}, nil
 }
 
 // GetServerMetrics gets server metrics
 func (s *Scheduler) GetServerMetrics(serverID string) (*models.ServerMetrics, error) {
 	// Implementation placeholder
-	return nil, fmt.Errorf("not implemented")
+	return nil, fmt.Errorf("metrics not available")
 }
 
 // GetServerCounts returns server counts by status
 func (s *Scheduler) GetServerCounts() (map[models.ServerStatus]int, error) {
-	// Implementation placeholder
-	return make(map[models.ServerStatus]int), nil
+	ctx := context.Background()
+	return s.serverRepo.CountByStatus(ctx)
 }
 
 // Helper functions

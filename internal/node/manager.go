@@ -263,27 +263,46 @@ func (m *Manager) GetNodeContainerInfo(ctx context.Context, nodeID string) (*doc
 // GetNode retrieves a node by ID
 func (m *Manager) GetNode(nodeID string) (*models.Node, error) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	state, exists := m.nodes[nodeID]
-	if !exists {
-		return nil, fmt.Errorf("node not found: %s", nodeID)
+	m.mu.RUnlock()
+
+	if exists {
+		return state.Node, nil
 	}
 
-	return state.Node, nil
+	// If not in memory, check database
+	ctx := context.Background()
+	node, err := m.nodeRepo.GetByID(ctx, nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node: %w", err)
+	}
+	if node == nil {
+		return nil, fmt.Errorf("node not found: %s", nodeID)
+	}
+	return node, nil
 }
 
-// ListNodes retrieves all registered nodes
+// ListNodes retrieves all nodes (from memory and database)
 func (m *Manager) ListNodes() ([]*models.Node, error) {
+	// Get all nodes from database
+	ctx := context.Background()
+	dbNodes, err := m.nodeRepo.List(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list nodes from database: %w", err)
+	}
+
+	// Merge with in-memory state (for real-time status)
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	nodes := make([]*models.Node, 0, len(m.nodes))
-	for _, state := range m.nodes {
-		nodes = append(nodes, state.Node)
+	for _, node := range dbNodes {
+		if state, exists := m.nodes[node.ID]; exists {
+			// Update with real-time status from memory
+			node.Status = state.Node.Status
+		}
 	}
 
-	return nodes, nil
+	return dbNodes, nil
 }
 
 // UpdateNodeStatus updates the status of a node
@@ -305,15 +324,11 @@ func (m *Manager) UpdateNodeStatus(nodeID string, status models.NodeStatus) erro
 // Update updates a node
 func (m *Manager) Update(node *models.Node) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	state, exists := m.nodes[node.ID]
-	if !exists {
-		return fmt.Errorf("node not found: %s", node.ID)
+	if state, exists := m.nodes[node.ID]; exists {
+		state.Node = node
+		state.LastHeartbeat = time.Now()
 	}
-
-	state.Node = node
-	state.LastHeartbeat = time.Now()
+	m.mu.Unlock()
 
 	// Update in database
 	ctx := context.Background()
