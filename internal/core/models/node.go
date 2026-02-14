@@ -68,7 +68,7 @@ type CreateNodeRequest struct {
 	Hostname          string   `json:"hostname" binding:"required"`
 	IPAddress         string   `json:"ip_address" binding:"required"`
 	Port              int      `json:"port" binding:"required,min=1,max=65535"`
-	GameTypes         []string `json:"game_types" binding:"required,min=1"`
+	GameType          string   `json:"game_type" binding:"required"`
 	TotalCPUCores     int      `json:"total_cpu_cores" binding:"required,min=1"`
 	TotalMemoryMB     int64    `json:"total_memory_mb" binding:"required,min=1024"`
 	TotalStorageMB    int64    `json:"total_storage_mb" binding:"required,min=1024"`

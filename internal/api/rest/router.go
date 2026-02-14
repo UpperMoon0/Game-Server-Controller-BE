@@ -120,6 +120,9 @@ func (s *Server) registerRoutes() {
 
 		// Metrics endpoint
 		v1.GET("/metrics", s.getClusterMetrics)
+
+		// Game types endpoint
+		v1.GET("/game-types", s.getGameTypes)
 	}
 }
 
@@ -174,6 +177,23 @@ func (s *Server) getClusterMetrics(c *gin.Context) {
 		"nodes":   clusterMetrics,
 		"servers": serverCounts,
 		"timestamp": time.Now().UTC(),
+	})
+}
+
+// getGameTypes returns the list of supported game types
+func (s *Server) getGameTypes(c *gin.Context) {
+	// Only Minecraft is supported for now
+	gameTypes := []gin.H{
+		{
+			"id":          "minecraft",
+			"name":        "Minecraft",
+			"description": "Minecraft Java Edition server",
+			"default_port": 25565,
+		},
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"game_types": gameTypes,
 	})
 }
 

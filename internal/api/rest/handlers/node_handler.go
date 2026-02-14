@@ -118,7 +118,7 @@ func (h *NodeHandler) CreateNode(c *gin.Context) {
 		IPAddress:          req.IPAddress,
 		Port:               req.Port,
 		Status:             models.NodeStatusOffline,
-		GameTypes:          req.GameTypes,
+		GameTypes:          []string{req.GameType},
 		TotalCPUCores:      req.TotalCPUCores,
 		TotalMemoryMB:      req.TotalMemoryMB,
 		TotalStorageMB:     req.TotalStorageMB,
