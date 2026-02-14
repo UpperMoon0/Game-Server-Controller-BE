@@ -42,7 +42,7 @@ jobs:
         DOMAIN_NAME=$(az keyvault secret show --vault-name nstutcommonkv --name domain-name --query value -o tsv)
 
         # Parse JDBC URL: jdbc:postgresql://host:port -> host:port
-        DB_HOST=$(echo "$DB_URL" | sed 's|jdbc:postgresql://||')
+        DB_HOST_PORT=$(echo "$DB_URL" | sed 's|jdbc:postgresql://||')
 
         echo "::add-mask::$VPS_HOST"
         echo "::add-mask::$VPS_USER"
@@ -53,7 +53,7 @@ jobs:
         echo "VPS_USERNAME=$VPS_USER" >> $GITHUB_OUTPUT
         echo "VPS_PASSWORD=$VPS_PASS" >> $GITHUB_OUTPUT
         
-        echo "DB_HOST=$DB_HOST" >> $GITHUB_OUTPUT
+        echo "DB_URL=$DB_HOST_PORT" >> $GITHUB_OUTPUT
         echo "DB_USERNAME=$DB_USERNAME" >> $GITHUB_OUTPUT
         echo "DB_PASSWORD=$DB_PASSWORD" >> $GITHUB_OUTPUT
         echo "DOMAIN_NAME=$DOMAIN_NAME" >> $GITHUB_OUTPUT
@@ -73,7 +73,7 @@ jobs:
     - name: Deploy to VPS
       uses: appleboy/ssh-action@v1.0.3
       env:
-        DB_HOST: ${{ steps.kv.outputs.DB_HOST }}
+        DB_URL: ${{ steps.kv.outputs.DB_URL }}
         DB_USERNAME: ${{ steps.kv.outputs.DB_USERNAME }}
         DB_PASSWORD: ${{ steps.kv.outputs.DB_PASSWORD }}
         DOMAIN_NAME: ${{ steps.kv.outputs.DOMAIN_NAME }}
@@ -83,14 +83,14 @@ jobs:
         password: ${{ steps.kv.outputs.VPS_PASSWORD }}
         port: 22
         timeout: 120s
-        envs: DB_HOST,DB_USERNAME,DB_PASSWORD,DOMAIN_NAME
+        envs: DB_URL,DB_USERNAME,DB_PASSWORD,DOMAIN_NAME
         script: |
           mkdir -p /root/game-server-controller-be
           cd /root/game-server-controller-be
 
           # Create .env file from secrets
           echo "ENVIRONMENT=production" > .env
-          echo "DATABASE_HOST=${DB_HOST}" >> .env
+          echo "DB_URL=${DB_URL}" >> .env
           echo "DATABASE_USER=${DB_USERNAME}" >> .env
           echo "DATABASE_PASSWORD=${DB_PASSWORD}" >> .env
           echo "DOMAIN_NAME=${DOMAIN_NAME}" >> .env

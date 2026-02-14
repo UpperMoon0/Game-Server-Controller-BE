@@ -18,11 +18,11 @@ type Config struct {
 	Environment string `mapstructure:"ENVIRONMENT"`
 
 	// Database Configuration (PostgreSQL only)
-	DatabaseHost     string `mapstructure:"DATABASE_HOST"` // Format: "host:port" or just "host" (default port 5432)
-	DatabaseName     string `mapstructure:"DATABASE_NAME"`
-	DatabaseUser     string `mapstructure:"DATABASE_USER"`
+	DBUrl           string `mapstructure:"DB_URL"`       // Format: "host:port"
+	DatabaseName    string `mapstructure:"DATABASE_NAME"`
+	DatabaseUser    string `mapstructure:"DATABASE_USER"`
 	DatabasePassword string `mapstructure:"DATABASE_PASSWORD"`
-	DatabaseSSLMode  string `mapstructure:"DATABASE_SSL_MODE"`
+	DatabaseSSLMode string `mapstructure:"DATABASE_SSL_MODE"`
 
 	// Redis Configuration
 	RedisHost     string `mapstructure:"REDIS_HOST"`
@@ -60,7 +60,7 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("GRPC_HOST", "0.0.0.0")
 	v.SetDefault("GRPC_PORT", 50051)
 	v.SetDefault("ENVIRONMENT", "development")
-	v.SetDefault("DATABASE_HOST", "localhost:5432")
+	v.SetDefault("DB_URL", "localhost:5432")
 	v.SetDefault("DATABASE_NAME", "game_server")
 	v.SetDefault("DATABASE_SSL_MODE", "disable")
 	v.SetDefault("REDIS_HOST", "localhost")
@@ -121,13 +121,13 @@ func (c *Config) GetDatabaseDSN() string {
 		host, port, c.DatabaseUser, c.DatabasePassword, c.DatabaseName, c.DatabaseSSLMode)
 }
 
-// parseHostPort parses DATABASE_HOST which can be "host:port" or just "host"
+// parseHostPort parses DB_URL which can be "host:port" or just "host"
 func (c *Config) parseHostPort() (host, port string) {
-	parts := strings.Split(c.DatabaseHost, ":")
+	parts := strings.Split(c.DBUrl, ":")
 	if len(parts) == 2 {
 		return parts[0], parts[1]
 	}
-	return c.DatabaseHost, "5432" // default PostgreSQL port
+	return c.DBUrl, "5432" // default PostgreSQL port
 }
 
 // GetRedisAddress returns the Redis address

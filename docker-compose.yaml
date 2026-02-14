@@ -32,7 +32,8 @@ services:
       - "50051:50051"
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      - DATABASE_HOST=${DATABASE_HOST}
+      - DB_URL=${DB_URL}
+      - DATABASE_NAME=${DATABASE_NAME:-game_server}
       - DATABASE_USER=${DATABASE_USER}
       - DATABASE_PASSWORD=${DATABASE_PASSWORD}
       - DATABASE_SSL_MODE=${DATABASE_SSL_MODE:-disable}

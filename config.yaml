@@ -9,7 +9,7 @@ grpc_host: "0.0.0.0"
 grpc_port: 50051
 
 # Database Configuration (PostgreSQL)
-database_host: "localhost:5432"
+db_url: "localhost:5432"
 database_name: "game_server"
 database_user: ""
 database_password: ""
