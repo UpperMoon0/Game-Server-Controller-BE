@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -15,11 +16,10 @@ type Config struct {
 	GRPCHost    string `mapstructure:"GRPC_HOST"`
 	GRPCPort    int    `mapstructure:"GRPC_PORT"`
 	Environment string `mapstructure:"ENVIRONMENT"`
-	
+
 	// Database Configuration
 	DatabaseType     string `mapstructure:"DATABASE_TYPE"`
-	DatabaseHost     string `mapstructure:"DATABASE_HOST"`
-	DatabasePort     int    `mapstructure:"DATABASE_PORT"`
+	DatabaseHost     string `mapstructure:"DATABASE_HOST"` // Format: "host:port" or just "host" (default port 5432)
 	DatabaseName     string `mapstructure:"DATABASE_NAME"`
 	DatabaseUser     string `mapstructure:"DATABASE_USER"`
 	DatabasePassword string `mapstructure:"DATABASE_PASSWORD"`
@@ -62,8 +62,8 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("GRPC_PORT", 50051)
 	v.SetDefault("ENVIRONMENT", "development")
 	v.SetDefault("DATABASE_TYPE", "sqlite")
-	v.SetDefault("DATABASE_HOST", "localhost")
-	v.SetDefault("DATABASE_PORT", 5432)
+	v.SetDefault("DATABASE_HOST", "localhost:5432")
+	v.SetDefault("DATABASE_NAME", "game_server")
 	v.SetDefault("DATABASE_SSL_MODE", "disable")
 	v.SetDefault("REDIS_HOST", "localhost")
 	v.SetDefault("REDIS_PORT", 6379)
@@ -121,8 +121,20 @@ func (c *Config) GetDatabaseDSN() string {
 	if c.DatabaseType == "sqlite" {
 		return c.DatabaseHost // This is actually the file path for sqlite
 	}
-	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		c.DatabaseHost, c.DatabasePort, c.DatabaseUser, c.DatabasePassword, c.DatabaseName, c.DatabaseSSLMode)
+
+	// Parse host:port from DatabaseHost
+	host, port := c.parseHostPort()
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		host, port, c.DatabaseUser, c.DatabasePassword, c.DatabaseName, c.DatabaseSSLMode)
+}
+
+// parseHostPort parses DATABASE_HOST which can be "host:port" or just "host"
+func (c *Config) parseHostPort() (host, port string) {
+	parts := strings.Split(c.DatabaseHost, ":")
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+	return c.DatabaseHost, "5432" // default PostgreSQL port
 }
 
 // GetRedisAddress returns the Redis address

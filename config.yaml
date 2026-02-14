@@ -10,8 +10,7 @@ grpc_port: 50051
 
 # Database Configuration
 database_type: "postgres"
-database_host: ""
-database_port: 5432
+database_host: "localhost:5432"
 database_name: "game_server"
 database_user: ""
 database_password: ""
