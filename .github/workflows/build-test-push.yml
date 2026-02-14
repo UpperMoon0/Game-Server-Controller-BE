@@ -65,23 +65,11 @@ jobs:
           inlineScript: |
             DOCKER_USER=$(az keyvault secret show --vault-name nstutcommonkv --name dockerhub-username --query value -o tsv)
             DOCKER_TOKEN=$(az keyvault secret show --vault-name nstutcommonkv --name dockerhub-token --query value -o tsv)
-            GH_PAT=$(az keyvault secret show --vault-name nstutcommonkv --name github-pat --query value -o tsv)
-            DB_URL=$(az keyvault secret show --vault-name nstutcommonkv --name db-url --query value -o tsv)
-            DB_USERNAME=$(az keyvault secret show --vault-name nstutcommonkv --name db-username --query value -o tsv)
-            DB_PASSWORD=$(az keyvault secret show --vault-name nstutcommonkv --name db-password --query value -o tsv)
-            DOMAIN_NAME=$(az keyvault secret show --vault-name nstutcommonkv --name domain-name --query value -o tsv)
             
             echo "::add-mask::$DOCKER_TOKEN"
-            echo "::add-mask::$GH_PAT"
-            echo "::add-mask::$DB_PASSWORD"
             
             echo "DOCKER_USER=$DOCKER_USER" >> $GITHUB_OUTPUT
             echo "DOCKER_TOKEN=$DOCKER_TOKEN" >> $GITHUB_OUTPUT
-            echo "GH_PAT=$GH_PAT" >> $GITHUB_OUTPUT
-            echo "DB_URL=$DB_URL" >> $GITHUB_OUTPUT
-            echo "DB_USERNAME=$DB_USERNAME" >> $GITHUB_OUTPUT
-            echo "DB_PASSWORD=$DB_PASSWORD" >> $GITHUB_OUTPUT
-            echo "DOMAIN_NAME=$DOMAIN_NAME" >> $GITHUB_OUTPUT
 
       - name: Log in to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -111,10 +99,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          secrets: |
-            DB_URL=${{ steps.kv.outputs.DB_URL }}
-            DB_USERNAME=${{ steps.kv.outputs.DB_USERNAME }}
-            DB_PASSWORD=${{ steps.kv.outputs.DB_PASSWORD }}
 
       - name: Extract image tag
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
