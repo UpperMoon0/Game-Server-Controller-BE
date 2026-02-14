@@ -39,14 +39,11 @@ jobs:
         DB_URL=$(az keyvault secret show --vault-name nstutcommonkv --name db-url --query value -o tsv)
         DB_USERNAME=$(az keyvault secret show --vault-name nstutcommonkv --name db-username --query value -o tsv)
         DB_PASSWORD=$(az keyvault secret show --vault-name nstutcommonkv --name db-password --query value -o tsv)
-        
-        JWT_SECRET=$(az keyvault secret show --vault-name nstutcommonkv --name jwt-secret --query value -o tsv)
 
         echo "::add-mask::$VPS_HOST"
         echo "::add-mask::$VPS_USER"
         echo "::add-mask::$VPS_PASS"
         echo "::add-mask::$DB_PASSWORD"
-        echo "::add-mask::$JWT_SECRET"
 
         echo "VPS_HOST=$VPS_HOST" >> $GITHUB_OUTPUT
         echo "VPS_USERNAME=$VPS_USER" >> $GITHUB_OUTPUT
@@ -55,8 +52,6 @@ jobs:
         echo "DB_URL=$DB_URL" >> $GITHUB_OUTPUT
         echo "DB_USERNAME=$DB_USERNAME" >> $GITHUB_OUTPUT
         echo "DB_PASSWORD=$DB_PASSWORD" >> $GITHUB_OUTPUT
-        
-        echo "JWT_SECRET=$JWT_SECRET" >> $GITHUB_OUTPUT
 
     - name: Copy docker-compose.yaml to VPS
       uses: appleboy/scp-action@v0.1.7
@@ -76,14 +71,13 @@ jobs:
         DB_URL: ${{ steps.kv.outputs.DB_URL }}
         DB_USERNAME: ${{ steps.kv.outputs.DB_USERNAME }}
         DB_PASSWORD: ${{ steps.kv.outputs.DB_PASSWORD }}
-        JWT_SECRET: ${{ steps.kv.outputs.JWT_SECRET }}
       with:
         host: ${{ steps.kv.outputs.VPS_HOST }}
         username: ${{ steps.kv.outputs.VPS_USERNAME }}
         password: ${{ steps.kv.outputs.VPS_PASSWORD }}
         port: 22
         timeout: 120s
-        env: DB_URL,DB_USERNAME,DB_PASSWORD,JWT_SECRET
+        env: DB_URL,DB_USERNAME,DB_PASSWORD
         script: |
           mkdir -p /root/game-server-controller-be
           cd /root/game-server-controller-be
@@ -93,7 +87,6 @@ jobs:
           echo "DATABASE_URL=${DB_URL}" >> .env
           echo "DATABASE_USER=${DB_USERNAME}" >> .env
           echo "DATABASE_PASSWORD=${DB_PASSWORD}" >> .env
-          echo "JWT_SECRET=${JWT_SECRET}" >> .env
 
           docker pull nstut/game-server-controller-be:${{ github.event.inputs.image_tag || 'latest' }}
           docker compose -f docker-compose.yaml up -d --remove-orphans
