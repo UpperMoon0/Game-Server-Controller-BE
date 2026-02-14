@@ -7,6 +7,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
@@ -51,6 +52,15 @@ func NewContainerManager(volumeMgr *VolumeManager, logger *zap.Logger) (*Contain
 
 // CreateNodeContainer creates a new node container with volumes
 func (cm *ContainerManager) CreateNodeContainer(ctx context.Context, cfg *NodeContainerConfig) (string, error) {
+	// Pull the latest image first
+	cm.logger.Info("Pulling latest node agent image", zap.String("image", cfg.Image))
+	reader, err := cm.client.ImagePull(ctx, cfg.Image, image.PullOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to pull image %s: %w", cfg.Image, err)
+	}
+	// Close the reader to ensure the pull is complete
+	reader.Close()
+
 	// Create volumes first
 	volumeNames := cm.volumeMgr.GetNodeVolumeNames(cfg.NodeID)
 	if err := cm.createVolumes(ctx, volumeNames); err != nil {

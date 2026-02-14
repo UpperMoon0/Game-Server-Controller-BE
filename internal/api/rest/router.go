@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/game-server/controller/internal/api/rest/handlers"
 	"github.com/game-server/controller/internal/core/repository"
+	"github.com/game-server/controller/internal/docker"
 	"github.com/game-server/controller/internal/node"
 	"github.com/game-server/controller/internal/scheduler"
 	"github.com/game-server/controller/pkg/config"
@@ -20,13 +21,14 @@ import (
 
 // Server represents the REST API server
 type Server struct {
-	router      *gin.Engine
-	httpServer  *http.Server
-	cfg         *config.Config
-	nodeRepo    *node.Manager
-	serverRepo  *repository.ServerRepository
-	scheduler   *scheduler.Scheduler
-	logger      *zap.Logger
+	router       *gin.Engine
+	httpServer   *http.Server
+	cfg          *config.Config
+	nodeRepo     *node.Manager
+	serverRepo   *repository.ServerRepository
+	scheduler    *scheduler.Scheduler
+	containerMgr *docker.ContainerManager
+	logger       *zap.Logger
 }
 
 // NewServer creates a new REST API server
@@ -35,6 +37,7 @@ func NewServer(
 	nodeRepo *node.Manager,
 	serverRepo *repository.ServerRepository,
 	scheduler *scheduler.Scheduler,
+	containerMgr *docker.ContainerManager,
 	logger *zap.Logger,
 ) *Server {
 	// Set Gin mode based on environment
@@ -48,12 +51,13 @@ func NewServer(
 	router.Use(CORSMiddleware())
 
 	return &Server{
-		router:      router,
-		cfg:         cfg,
-		nodeRepo:    nodeRepo,
-		serverRepo:  serverRepo,
-		scheduler:   scheduler,
-		logger:      logger,
+		router:       router,
+		cfg:          cfg,
+		nodeRepo:     nodeRepo,
+		serverRepo:   serverRepo,
+		scheduler:    scheduler,
+		containerMgr: containerMgr,
+		logger:       logger,
 	}
 }
 
@@ -108,7 +112,7 @@ func (s *Server) registerRoutes() {
 	v1 := s.router.Group("/api/v1")
 	{
 		// Register node handler
-		nodeHandler := handlers.NewNodeHandler(s.nodeRepo, s.scheduler, s.logger)
+		nodeHandler := handlers.NewNodeHandler(s.nodeRepo, s.scheduler, s.containerMgr, s.cfg, s.logger)
 		nodeHandler.RegisterRoutes(v1)
 
 		// Register server handler
@@ -237,7 +241,7 @@ func CORSMiddleware() gin.HandlerFunc {
 
 // RunServer starts the REST API server (standalone function for testing)
 func RunServer(cfg *config.Config, logger *zap.Logger) error {
-	server := NewServer(nil, nil, nil, nil, logger)
+	server := NewServer(nil, nil, nil, nil, nil, logger)
 	
 	if err := server.Start(); err != nil {
 		return err

@@ -97,7 +97,7 @@ func main() {
 	}
 
 	// Initialize REST API server
-	restServer := rest.NewServer(cfg, nodeMgr, serverRepo, sched, log)
+	restServer := rest.NewServer(cfg, nodeMgr, serverRepo, sched, containerMgr, log)
 
 	// Start gRPC server
 	go func() {

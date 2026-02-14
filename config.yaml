@@ -15,11 +15,9 @@ database_user: ""
 database_password: ""
 database_ssl_mode: "disable"
 
-# Redis Configuration
-redis_host: "localhost"
-redis_port: 6379
-redis_password: ""
-redis_db: 0
+# Node Agent Configuration
+node_agent_image: "nstut/game-server-node:latest"
+node_network_name: "nstut-network"
 
 # Node Configuration
 default_heartbeat_interval: 30

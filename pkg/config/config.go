@@ -24,6 +24,10 @@ type Config struct {
 	DatabasePassword string `mapstructure:"DATABASE_PASSWORD"`
 	DatabaseSSLMode string `mapstructure:"DATABASE_SSL_MODE"`
 
+	// Node Agent Configuration
+	NodeAgentImage  string `mapstructure:"NODE_AGENT_IMAGE"`
+	NodeNetworkName string `mapstructure:"NODE_NETWORK_NAME"`
+
 	// Node Configuration
 	DefaultHeartbeatInterval int `mapstructure:"DEFAULT_HEARTBEAT_INTERVAL"`
 	NodeTimeout              int `mapstructure:"NODE_TIMEOUT"`
@@ -57,6 +61,8 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("DB_URL", "localhost:5432")
 	v.SetDefault("DATABASE_NAME", "game_server")
 	v.SetDefault("DATABASE_SSL_MODE", "disable")
+	v.SetDefault("NODE_AGENT_IMAGE", "nstut/game-server-node:latest")
+	v.SetDefault("NODE_NETWORK_NAME", "nstut-network")
 	v.SetDefault("DEFAULT_HEARTBEAT_INTERVAL", 30)
 	v.SetDefault("NODE_TIMEOUT", 120)
 	v.SetDefault("METRICS_ENABLED", true)
