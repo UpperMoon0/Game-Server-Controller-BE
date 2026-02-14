@@ -69,6 +69,7 @@ jobs:
             DB_URL=$(az keyvault secret show --vault-name nstutcommonkv --name db-url --query value -o tsv)
             DB_USERNAME=$(az keyvault secret show --vault-name nstutcommonkv --name db-username --query value -o tsv)
             DB_PASSWORD=$(az keyvault secret show --vault-name nstutcommonkv --name db-password --query value -o tsv)
+            DOMAIN_NAME=$(az keyvault secret show --vault-name nstutcommonkv --name domain-name --query value -o tsv)
             
             echo "::add-mask::$DOCKER_TOKEN"
             echo "::add-mask::$GH_PAT"
@@ -80,6 +81,7 @@ jobs:
             echo "DB_URL=$DB_URL" >> $GITHUB_OUTPUT
             echo "DB_USERNAME=$DB_USERNAME" >> $GITHUB_OUTPUT
             echo "DB_PASSWORD=$DB_PASSWORD" >> $GITHUB_OUTPUT
+            echo "DOMAIN_NAME=$DOMAIN_NAME" >> $GITHUB_OUTPUT
 
       - name: Log in to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

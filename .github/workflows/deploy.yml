@@ -39,6 +39,7 @@ jobs:
         DB_URL=$(az keyvault secret show --vault-name nstutcommonkv --name db-url --query value -o tsv)
         DB_USERNAME=$(az keyvault secret show --vault-name nstutcommonkv --name db-username --query value -o tsv)
         DB_PASSWORD=$(az keyvault secret show --vault-name nstutcommonkv --name db-password --query value -o tsv)
+        DOMAIN_NAME=$(az keyvault secret show --vault-name nstutcommonkv --name domain-name --query value -o tsv)
 
         # Parse JDBC URL: jdbc:postgresql://host:port -> host:port
         DB_HOST=$(echo "$DB_URL" | sed 's|jdbc:postgresql://||')
@@ -55,6 +56,7 @@ jobs:
         echo "DB_HOST=$DB_HOST" >> $GITHUB_OUTPUT
         echo "DB_USERNAME=$DB_USERNAME" >> $GITHUB_OUTPUT
         echo "DB_PASSWORD=$DB_PASSWORD" >> $GITHUB_OUTPUT
+        echo "DOMAIN_NAME=$DOMAIN_NAME" >> $GITHUB_OUTPUT
 
     - name: Copy docker-compose.yaml to VPS
       uses: appleboy/scp-action@v0.1.7
@@ -74,13 +76,14 @@ jobs:
         DB_HOST: ${{ steps.kv.outputs.DB_HOST }}
         DB_USERNAME: ${{ steps.kv.outputs.DB_USERNAME }}
         DB_PASSWORD: ${{ steps.kv.outputs.DB_PASSWORD }}
+        DOMAIN_NAME: ${{ steps.kv.outputs.DOMAIN_NAME }}
       with:
         host: ${{ steps.kv.outputs.VPS_HOST }}
         username: ${{ steps.kv.outputs.VPS_USERNAME }}
         password: ${{ steps.kv.outputs.VPS_PASSWORD }}
         port: 22
         timeout: 120s
-        envs: DB_HOST,DB_USERNAME,DB_PASSWORD
+        envs: DB_HOST,DB_USERNAME,DB_PASSWORD,DOMAIN_NAME
         script: |
           mkdir -p /root/game-server-controller-be
           cd /root/game-server-controller-be
@@ -90,6 +93,7 @@ jobs:
           echo "DATABASE_HOST=${DB_HOST}" >> .env
           echo "DATABASE_USER=${DB_USERNAME}" >> .env
           echo "DATABASE_PASSWORD=${DB_PASSWORD}" >> .env
+          echo "DOMAIN_NAME=${DOMAIN_NAME}" >> .env
 
           # Stop existing containers to free up ports
           docker compose down || true
