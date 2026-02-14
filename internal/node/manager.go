@@ -97,11 +97,11 @@ func NewManager(
 	}
 }
 
-// RegisterNode registers a new node with the manager
+// RegisterNode registers a new node with the manager (called when node agent connects via gRPC)
 func (m *Manager) RegisterNode(ctx context.Context, node *models.Node) error {
 	m.mu.Lock()
-	
-	// Check if node already exists
+
+	// Check if node already exists in memory
 	existing, exists := m.nodes[node.ID]
 	if exists {
 		// Update existing node state
@@ -109,14 +109,14 @@ func (m *Manager) RegisterNode(ctx context.Context, node *models.Node) error {
 		existing.Connected = true
 		existing.LastHeartbeat = time.Now()
 		m.mu.Unlock()
-		
+
 		m.logger.Info("Node reconnected",
 			zap.String("node_id", node.ID),
 			zap.String("name", node.Name))
 		return nil
 	}
 
-	// Create new node state
+	// Create new node state in memory
 	state := &NodeState{
 		Node:          node,
 		Connected:     true,
@@ -132,10 +132,37 @@ func (m *Manager) RegisterNode(ctx context.Context, node *models.Node) error {
 		zap.String("name", node.Name),
 		zap.String("game_type", node.GameType))
 
-	// Update database
+	// Check if node exists in database, create if not
+	existingNode, err := m.nodeRepo.GetByID(ctx, node.ID)
+	if err != nil {
+		return fmt.Errorf("failed to check node existence: %w", err)
+	}
+	if existingNode == nil {
+		if err := m.nodeRepo.Create(ctx, node); err != nil {
+			return fmt.Errorf("failed to create node in database: %w", err)
+		}
+	} else {
+		// Update status to online in database
+		node.Status = models.NodeStatusOnline
+		if err := m.nodeRepo.Update(ctx, node); err != nil {
+			m.logger.Error("Failed to update node status", zap.Error(err))
+		}
+	}
+
+	return nil
+}
+
+// CreateNode creates a new node in the database only (called via REST API)
+func (m *Manager) CreateNode(ctx context.Context, node *models.Node) error {
+	// Only create in database - in-memory state is for connected agents only
 	if err := m.nodeRepo.Create(ctx, node); err != nil {
 		return fmt.Errorf("failed to create node in database: %w", err)
 	}
+
+	m.logger.Info("Node created in database",
+		zap.String("node_id", node.ID),
+		zap.String("name", node.Name),
+		zap.String("game_type", node.GameType))
 
 	return nil
 }

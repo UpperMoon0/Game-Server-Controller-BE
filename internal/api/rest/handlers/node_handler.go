@@ -121,8 +121,9 @@ func (h *NodeHandler) CreateNode(c *gin.Context) {
 		HeartbeatInterval: 30,
 	}
 
+	// Only create in database - in-memory state is for connected agents only
 	ctx := c.Request.Context()
-	if err := h.nodeRepo.RegisterNode(ctx, node); err != nil {
+	if err := h.nodeRepo.CreateNode(ctx, node); err != nil {
 		h.logger.Error("Failed to create node", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to create node",
@@ -133,7 +134,7 @@ func (h *NodeHandler) CreateNode(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"node":     node,
-		"message": "Node created successfully",
+		"message":  "Node created successfully",
 	})
 }
 
