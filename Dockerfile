@@ -21,8 +21,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o controller ./cmd/
 # Production stage
 FROM alpine:latest
 
-# Install bash, ca-certificates, postgresql-client, and curl
-RUN apk --no-cache add bash ca-certificates postgresql-client curl
+# Install bash, ca-certificates, postgresql-client, curl, and OpenJDK (required for Flyway)
+RUN apk --no-cache add bash ca-certificates postgresql-client curl openjdk17-jre-headless
 
 # Install Flyway with PostgreSQL JDBC driver
 RUN curl -L -o /tmp/flyway.tar.gz "https://github.com/flyway/flyway/releases/download/flyway-12.0.1/flyway-commandline-12.0.1.tar.gz" && \
