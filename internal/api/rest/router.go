@@ -25,7 +25,6 @@ type Server struct {
 	cfg         *config.Config
 	nodeRepo    *node.Manager
 	serverRepo  *repository.ServerRepository
-	metricsRepo *repository.MetricsRepository
 	scheduler   *scheduler.Scheduler
 	logger      *zap.Logger
 }
@@ -35,7 +34,6 @@ func NewServer(
 	cfg *config.Config,
 	nodeRepo *node.Manager,
 	serverRepo *repository.ServerRepository,
-	metricsRepo *repository.MetricsRepository,
 	scheduler *scheduler.Scheduler,
 	logger *zap.Logger,
 ) *Server {
@@ -54,7 +52,6 @@ func NewServer(
 		cfg:         cfg,
 		nodeRepo:    nodeRepo,
 		serverRepo:  serverRepo,
-		metricsRepo: metricsRepo,
 		scheduler:   scheduler,
 		logger:      logger,
 	}
@@ -240,7 +237,7 @@ func CORSMiddleware() gin.HandlerFunc {
 
 // RunServer starts the REST API server (standalone function for testing)
 func RunServer(cfg *config.Config, logger *zap.Logger) error {
-	server := NewServer(nil, nil, nil, nil, nil, logger)
+	server := NewServer(nil, nil, nil, nil, logger)
 	
 	if err := server.Start(); err != nil {
 		return err

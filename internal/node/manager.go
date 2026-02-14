@@ -17,7 +17,6 @@ import (
 type Manager struct {
 	nodeRepo      *repository.NodeRepository
 	serverRepo    *repository.ServerRepository
-	metricsRepo   *repository.MetricsRepository
 	volumeMgr     *docker.VolumeManager
 	containerMgr  *docker.ContainerManager
 	cfg           *config.Config
@@ -78,7 +77,6 @@ type StreamEvent struct {
 func NewManager(
 	nodeRepo *repository.NodeRepository,
 	serverRepo *repository.ServerRepository,
-	metricsRepo *repository.MetricsRepository,
 	volumeMgr *docker.VolumeManager,
 	containerMgr *docker.ContainerManager,
 	cfg *config.Config,
@@ -87,7 +85,6 @@ func NewManager(
 	return &Manager{
 		nodeRepo:     nodeRepo,
 		serverRepo:   serverRepo,
-		metricsRepo:  metricsRepo,
 		volumeMgr:    volumeMgr,
 		containerMgr: containerMgr,
 		cfg:          cfg,
@@ -378,12 +375,6 @@ func (m *Manager) UpdateNodeMetrics(nodeID string, metrics *models.NodeMetrics) 
 
 	state.Metrics = metrics
 	state.LastHeartbeat = time.Now()
-
-	// Store metrics in Redis
-	ctx := context.Background()
-	if err := m.metricsRepo.StoreNodeMetrics(ctx, metrics); err != nil {
-		m.logger.Error("Failed to store metrics", zap.Error(err))
-	}
 
 	return nil
 }

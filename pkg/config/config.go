@@ -24,12 +24,6 @@ type Config struct {
 	DatabasePassword string `mapstructure:"DATABASE_PASSWORD"`
 	DatabaseSSLMode string `mapstructure:"DATABASE_SSL_MODE"`
 
-	// Redis Configuration
-	RedisHost     string `mapstructure:"REDIS_HOST"`
-	RedisPort     int    `mapstructure:"REDIS_PORT"`
-	RedisPassword string `mapstructure:"REDIS_PASSWORD"`
-	RedisDB       int    `mapstructure:"REDIS_DB"`
-
 	// Node Configuration
 	DefaultHeartbeatInterval int `mapstructure:"DEFAULT_HEARTBEAT_INTERVAL"`
 	NodeTimeout              int `mapstructure:"NODE_TIMEOUT"`
@@ -63,9 +57,6 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("DB_URL", "localhost:5432")
 	v.SetDefault("DATABASE_NAME", "game_server")
 	v.SetDefault("DATABASE_SSL_MODE", "disable")
-	v.SetDefault("REDIS_HOST", "localhost")
-	v.SetDefault("REDIS_PORT", 6379)
-	v.SetDefault("REDIS_DB", 0)
 	v.SetDefault("DEFAULT_HEARTBEAT_INTERVAL", 30)
 	v.SetDefault("NODE_TIMEOUT", 120)
 	v.SetDefault("METRICS_ENABLED", true)
@@ -128,11 +119,6 @@ func (c *Config) parseHostPort() (host, port string) {
 		return parts[0], parts[1]
 	}
 	return c.DBUrl, "5432" // default PostgreSQL port
-}
-
-// GetRedisAddress returns the Redis address
-func (c *Config) GetRedisAddress() string {
-	return fmt.Sprintf("%s:%d", c.RedisHost, c.RedisPort)
 }
 
 // GetHeartbeatInterval returns the heartbeat interval as a duration

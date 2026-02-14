@@ -56,13 +56,6 @@ func main() {
 	}
 	defer db.Close()
 
-	// Initialize Redis
-	redis, err := repository.NewRedis(cfg)
-	if err != nil {
-		log.Fatal("Failed to initialize Redis", zap.Error(err))
-	}
-	defer redis.Close()
-
 	// Initialize Docker volume manager
 	volumeMgr, err := docker.NewVolumeManager(log)
 	if err != nil {
@@ -90,10 +83,9 @@ func main() {
 	// Initialize repositories
 	nodeRepo := repository.NewNodeRepository(db, log)
 	serverRepo := repository.NewServerRepository(db, log)
-	metricsRepo := repository.NewMetricsRepository(redis, log)
 
 	// Initialize node manager
-	nodeMgr := node.NewManager(nodeRepo, serverRepo, metricsRepo, volumeMgr, containerMgr, cfg, log)
+	nodeMgr := node.NewManager(nodeRepo, serverRepo, volumeMgr, containerMgr, cfg, log)
 
 	// Initialize scheduler
 	sched := scheduler.NewScheduler(nodeRepo, serverRepo, nodeMgr, log)
@@ -105,7 +97,7 @@ func main() {
 	}
 
 	// Initialize REST API server
-	restServer := rest.NewServer(cfg, nodeMgr, serverRepo, metricsRepo, sched, log)
+	restServer := rest.NewServer(cfg, nodeMgr, serverRepo, sched, log)
 
 	// Start gRPC server
 	go func() {
