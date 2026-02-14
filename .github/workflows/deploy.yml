@@ -36,80 +36,27 @@ jobs:
         VPS_USER=$(az keyvault secret show --vault-name nstutcommonkv --name vps-username --query value -o tsv)
         VPS_PASS=$(az keyvault secret show --vault-name nstutcommonkv --name vps-password --query value -o tsv)
         
-        ENVIRONMENT=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-environment --query value -o tsv)
-        DATABASE_TYPE=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-database-type --query value -o tsv)
-        DATABASE_HOST=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-database-host --query value -o tsv)
-        DATABASE_PORT=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-database-port --query value -o tsv)
-        DATABASE_NAME=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-database-name --query value -o tsv)
-        DATABASE_USER=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-database-username --query value -o tsv)
-        DATABASE_PASSWORD=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-database-password --query value -o tsv)
-        DATABASE_SSL_MODE=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-database-ssl-mode --query value -o tsv)
+        DB_URL=$(az keyvault secret show --vault-name nstutcommonkv --name db-url --query value -o tsv)
+        DB_USERNAME=$(az keyvault secret show --vault-name nstutcommonkv --name db-username --query value -o tsv)
+        DB_PASSWORD=$(az keyvault secret show --vault-name nstutcommonkv --name db-password --query value -o tsv)
         
-        REDIS_HOST=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-redis-host --query value -o tsv)
-        REDIS_PORT=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-redis-port --query value -o tsv)
-        REDIS_PASSWORD=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-redis-password --query value -o tsv)
-        REDIS_DB=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-redis-db --query value -o tsv)
-        
-        DEFAULT_HEARTBEAT_INTERVAL=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-heartbeat-interval --query value -o tsv)
-        NODE_TIMEOUT=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-node-timeout --query value -o tsv)
-        
-        METRICS_ENABLED=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-metrics-enabled --query value -o tsv)
-        METRICS_INTERVAL=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-metrics-interval --query value -o tsv)
-        METRICS_RETENTION_DAYS=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-metrics-retention --query value -o tsv)
-        
-        LOG_LEVEL=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-log-level --query value -o tsv)
-        LOG_FORMAT=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-log-format --query value -o tsv)
-        
-        AUTH_ENABLED=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-auth-enabled --query value -o tsv)
-        JWT_SECRET=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-jwt-secret --query value -o tsv)
-        JWT_EXPIRY=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-jwt-expiry --query value -o tsv)
-        
-        CLUSTER_ENABLED=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-cluster-enabled --query value -o tsv)
-        CLUSTER_NODE_ID=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-cluster-node-id --query value -o tsv)
-        CLUSTER_ADDRESS=$(az keyvault secret show --vault-name nstutcommonkv --name gs-controller-cluster-address --query value -o tsv)
+        JWT_SECRET=$(az keyvault secret show --vault-name nstutcommonkv --name jwt-secret --query value -o tsv)
 
         echo "::add-mask::$VPS_HOST"
         echo "::add-mask::$VPS_USER"
         echo "::add-mask::$VPS_PASS"
-        echo "::add-mask::$DATABASE_PASSWORD"
-        echo "::add-mask::$REDIS_PASSWORD"
+        echo "::add-mask::$DB_PASSWORD"
         echo "::add-mask::$JWT_SECRET"
 
         echo "VPS_HOST=$VPS_HOST" >> $GITHUB_OUTPUT
         echo "VPS_USERNAME=$VPS_USER" >> $GITHUB_OUTPUT
         echo "VPS_PASSWORD=$VPS_PASS" >> $GITHUB_OUTPUT
         
-        echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_OUTPUT
-        echo "DATABASE_TYPE=$DATABASE_TYPE" >> $GITHUB_OUTPUT
-        echo "DATABASE_HOST=$DATABASE_HOST" >> $GITHUB_OUTPUT
-        echo "DATABASE_PORT=$DATABASE_PORT" >> $GITHUB_OUTPUT
-        echo "DATABASE_NAME=$DATABASE_NAME" >> $GITHUB_OUTPUT
-        echo "DATABASE_USER=$DATABASE_USER" >> $GITHUB_OUTPUT
-        echo "DATABASE_PASSWORD=$DATABASE_PASSWORD" >> $GITHUB_OUTPUT
-        echo "DATABASE_SSL_MODE=$DATABASE_SSL_MODE" >> $GITHUB_OUTPUT
+        echo "DB_URL=$DB_URL" >> $GITHUB_OUTPUT
+        echo "DB_USERNAME=$DB_USERNAME" >> $GITHUB_OUTPUT
+        echo "DB_PASSWORD=$DB_PASSWORD" >> $GITHUB_OUTPUT
         
-        echo "REDIS_HOST=$REDIS_HOST" >> $GITHUB_OUTPUT
-        echo "REDIS_PORT=$REDIS_PORT" >> $GITHUB_OUTPUT
-        echo "REDIS_PASSWORD=$REDIS_PASSWORD" >> $GITHUB_OUTPUT
-        echo "REDIS_DB=$REDIS_DB" >> $GITHUB_OUTPUT
-        
-        echo "DEFAULT_HEARTBEAT_INTERVAL=$DEFAULT_HEARTBEAT_INTERVAL" >> $GITHUB_OUTPUT
-        echo "NODE_TIMEOUT=$NODE_TIMEOUT" >> $GITHUB_OUTPUT
-        
-        echo "METRICS_ENABLED=$METRICS_ENABLED" >> $GITHUB_OUTPUT
-        echo "METRICS_INTERVAL=$METRICS_INTERVAL" >> $GITHUB_OUTPUT
-        echo "METRICS_RETENTION_DAYS=$METRICS_RETENTION_DAYS" >> $GITHUB_OUTPUT
-        
-        echo "LOG_LEVEL=$LOG_LEVEL" >> $GITHUB_OUTPUT
-        echo "LOG_FORMAT=$LOG_FORMAT" >> $GITHUB_OUTPUT
-        
-        echo "AUTH_ENABLED=$AUTH_ENABLED" >> $GITHUB_OUTPUT
         echo "JWT_SECRET=$JWT_SECRET" >> $GITHUB_OUTPUT
-        echo "JWT_EXPIRY=$JWT_EXPIRY" >> $GITHUB_OUTPUT
-        
-        echo "CLUSTER_ENABLED=$CLUSTER_ENABLED" >> $GITHUB_OUTPUT
-        echo "CLUSTER_NODE_ID=$CLUSTER_NODE_ID" >> $GITHUB_OUTPUT
-        echo "CLUSTER_ADDRESS=$CLUSTER_ADDRESS" >> $GITHUB_OUTPUT
 
     - name: Copy docker-compose.yaml to VPS
       uses: appleboy/scp-action@v0.1.7
@@ -126,68 +73,27 @@ jobs:
     - name: Deploy to VPS
       uses: appleboy/ssh-action@v1.0.3
       env:
-        ENVIRONMENT: ${{ steps.kv.outputs.ENVIRONMENT }}
-        DATABASE_TYPE: ${{ steps.kv.outputs.DATABASE_TYPE }}
-        DATABASE_HOST: ${{ steps.kv.outputs.DATABASE_HOST }}
-        DATABASE_PORT: ${{ steps.kv.outputs.DATABASE_PORT }}
-        DATABASE_NAME: ${{ steps.kv.outputs.DATABASE_NAME }}
-        DATABASE_USER: ${{ steps.kv.outputs.DATABASE_USER }}
-        DATABASE_PASSWORD: ${{ steps.kv.outputs.DATABASE_PASSWORD }}
-        DATABASE_SSL_MODE: ${{ steps.kv.outputs.DATABASE_SSL_MODE }}
-        REDIS_HOST: ${{ steps.kv.outputs.REDIS_HOST }}
-        REDIS_PORT: ${{ steps.kv.outputs.REDIS_PORT }}
-        REDIS_PASSWORD: ${{ steps.kv.outputs.REDIS_PASSWORD }}
-        REDIS_DB: ${{ steps.kv.outputs.REDIS_DB }}
-        DEFAULT_HEARTBEAT_INTERVAL: ${{ steps.kv.outputs.DEFAULT_HEARTBEAT_INTERVAL }}
-        NODE_TIMEOUT: ${{ steps.kv.outputs.NODE_TIMEOUT }}
-        METRICS_ENABLED: ${{ steps.kv.outputs.METRICS_ENABLED }}
-        METRICS_INTERVAL: ${{ steps.kv.outputs.METRICS_INTERVAL }}
-        METRICS_RETENTION_DAYS: ${{ steps.kv.outputs.METRICS_RETENTION_DAYS }}
-        LOG_LEVEL: ${{ steps.kv.outputs.LOG_LEVEL }}
-        LOG_FORMAT: ${{ steps.kv.outputs.LOG_FORMAT }}
-        AUTH_ENABLED: ${{ steps.kv.outputs.AUTH_ENABLED }}
+        DB_URL: ${{ steps.kv.outputs.DB_URL }}
+        DB_USERNAME: ${{ steps.kv.outputs.DB_USERNAME }}
+        DB_PASSWORD: ${{ steps.kv.outputs.DB_PASSWORD }}
         JWT_SECRET: ${{ steps.kv.outputs.JWT_SECRET }}
-        JWT_EXPIRY: ${{ steps.kv.outputs.JWT_EXPIRY }}
-        CLUSTER_ENABLED: ${{ steps.kv.outputs.CLUSTER_ENABLED }}
-        CLUSTER_NODE_ID: ${{ steps.kv.outputs.CLUSTER_NODE_ID }}
-        CLUSTER_ADDRESS: ${{ steps.kv.outputs.CLUSTER_ADDRESS }}
       with:
         host: ${{ steps.kv.outputs.VPS_HOST }}
         username: ${{ steps.kv.outputs.VPS_USERNAME }}
         password: ${{ steps.kv.outputs.VPS_PASSWORD }}
         port: 22
         timeout: 120s
-        env: ENVIRONMENT,DATABASE_TYPE,DATABASE_HOST,DATABASE_PORT,DATABASE_NAME,DATABASE_USER,DATABASE_PASSWORD,DATABASE_SSL_MODE,REDIS_HOST,REDIS_PORT,REDIS_PASSWORD,REDIS_DB,DEFAULT_HEARTBEAT_INTERVAL,NODE_TIMEOUT,METRICS_ENABLED,METRICS_INTERVAL,METRICS_RETENTION_DAYS,LOG_LEVEL,LOG_FORMAT,AUTH_ENABLED,JWT_SECRET,JWT_EXPIRY,CLUSTER_ENABLED,CLUSTER_NODE_ID,CLUSTER_ADDRESS
+        env: DB_URL,DB_USERNAME,DB_PASSWORD,JWT_SECRET
         script: |
           mkdir -p /root/game-server-controller-be
           cd /root/game-server-controller-be
 
           # Create .env file from secrets
-          echo "ENVIRONMENT=${ENVIRONMENT:-production}" > .env
-          echo "DATABASE_TYPE=${DATABASE_TYPE:-sqlite}" >> .env
-          echo "DATABASE_HOST=${DATABASE_HOST:-./data/controller.db}" >> .env
-          echo "DATABASE_PORT=${DATABASE_PORT:-5432}" >> .env
-          echo "DATABASE_NAME=${DATABASE_NAME:-game_server_controller}" >> .env
-          echo "DATABASE_USER=${DATABASE_USER:-postgres}" >> .env
-          echo "DATABASE_PASSWORD=${DATABASE_PASSWORD}" >> .env
-          echo "DATABASE_SSL_MODE=${DATABASE_SSL_MODE:-disable}" >> .env
-          echo "REDIS_HOST=${REDIS_HOST:-redis}" >> .env
-          echo "REDIS_PORT=${REDIS_PORT:-6379}" >> .env
-          echo "REDIS_PASSWORD=${REDIS_PASSWORD}" >> .env
-          echo "REDIS_DB=${REDIS_DB:-0}" >> .env
-          echo "DEFAULT_HEARTBEAT_INTERVAL=${DEFAULT_HEARTBEAT_INTERVAL:-30}" >> .env
-          echo "NODE_TIMEOUT=${NODE_TIMEOUT:-120}" >> .env
-          echo "METRICS_ENABLED=${METRICS_ENABLED:-true}" >> .env
-          echo "METRICS_INTERVAL=${METRICS_INTERVAL:-5}" >> .env
-          echo "METRICS_RETENTION_DAYS=${METRICS_RETENTION_DAYS:-30}" >> .env
-          echo "LOG_LEVEL=${LOG_LEVEL:-info}" >> .env
-          echo "LOG_FORMAT=${LOG_FORMAT:-json}" >> .env
-          echo "AUTH_ENABLED=${AUTH_ENABLED:-false}" >> .env
+          echo "ENVIRONMENT=production" > .env
+          echo "DATABASE_URL=${DB_URL}" >> .env
+          echo "DATABASE_USER=${DB_USERNAME}" >> .env
+          echo "DATABASE_PASSWORD=${DB_PASSWORD}" >> .env
           echo "JWT_SECRET=${JWT_SECRET}" >> .env
-          echo "JWT_EXPIRY=${JWT_EXPIRY:-3600}" >> .env
-          echo "CLUSTER_ENABLED=${CLUSTER_ENABLED:-false}" >> .env
-          echo "CLUSTER_NODE_ID=${CLUSTER_NODE_ID:-controller-1}" >> .env
-          echo "CLUSTER_ADDRESS=${CLUSTER_ADDRESS}" >> .env
 
           docker pull nstut/game-server-controller-be:${{ github.event.inputs.image_tag || 'latest' }}
           docker compose -f docker-compose.yaml up -d --remove-orphans
