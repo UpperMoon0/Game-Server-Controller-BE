@@ -28,7 +28,10 @@ func NewNodeRepository(db *Database, logger *zap.Logger) *NodeRepository {
 
 // Create creates a new node in the database
 func (r *NodeRepository) Create(ctx context.Context, node *models.Node) error {
-	node.ID = uuid.New().String()
+	// Preserve existing ID if already set (e.g., from container creation)
+	if node.ID == "" {
+		node.ID = uuid.New().String()
+	}
 	node.CreatedAt = time.Now()
 	node.UpdatedAt = time.Now()
 
