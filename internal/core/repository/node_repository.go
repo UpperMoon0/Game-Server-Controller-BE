@@ -34,13 +34,13 @@ func (r *NodeRepository) Create(ctx context.Context, node *models.Node) error {
 
 	query := `
 		INSERT INTO nodes (
-			id, name, port, game_type, version,
+			id, name, port, game_type, version, initialized,
 			agent_version, heartbeat_interval, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
-		node.ID, node.Name, node.Port, node.GameType, node.Version,
+		node.ID, node.Name, node.Port, node.GameType, node.Version, node.Initialized,
 		node.AgentVersion, node.HeartbeatInterval,
 		node.CreatedAt, node.UpdatedAt,
 	)
@@ -59,7 +59,7 @@ func (r *NodeRepository) Create(ctx context.Context, node *models.Node) error {
 // GetByID retrieves a node by ID
 func (r *NodeRepository) GetByID(ctx context.Context, id string) (*models.Node, error) {
 	query := `
-		SELECT id, name, port, game_type, version,
+		SELECT id, name, port, game_type, version, initialized,
 			agent_version, heartbeat_interval,
 			created_at, updated_at, started_at
 		FROM nodes WHERE id = $1
@@ -71,7 +71,7 @@ func (r *NodeRepository) GetByID(ctx context.Context, id string) (*models.Node, 
 	var startedAt sql.NullTime
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&node.ID, &node.Name, &node.Port, &node.GameType, &version,
+		&node.ID, &node.Name, &node.Port, &node.GameType, &version, &node.Initialized,
 		&agentVersion, &node.HeartbeatInterval,
 		&node.CreatedAt, &node.UpdatedAt, &startedAt,
 	)
@@ -102,7 +102,7 @@ func (r *NodeRepository) GetByID(ctx context.Context, id string) (*models.Node, 
 // GetByName retrieves a node by name
 func (r *NodeRepository) GetByName(ctx context.Context, name string) (*models.Node, error) {
 	query := `
-		SELECT id, name, port, game_type, version,
+		SELECT id, name, port, game_type, version, initialized,
 			agent_version, heartbeat_interval,
 			created_at, updated_at, started_at
 		FROM nodes WHERE name = $1
@@ -114,7 +114,7 @@ func (r *NodeRepository) GetByName(ctx context.Context, name string) (*models.No
 	var startedAt sql.NullTime
 
 	err := r.db.QueryRowContext(ctx, query, name).Scan(
-		&node.ID, &node.Name, &node.Port, &node.GameType, &version,
+		&node.ID, &node.Name, &node.Port, &node.GameType, &version, &node.Initialized,
 		&agentVersion, &node.HeartbeatInterval,
 		&node.CreatedAt, &node.UpdatedAt, &startedAt,
 	)
@@ -146,7 +146,7 @@ func (r *NodeRepository) GetByName(ctx context.Context, name string) (*models.No
 func (r *NodeRepository) List(ctx context.Context, _ *models.NodeStatus) ([]*models.Node, error) {
 	// Note: status filtering is now done in-memory after fetching from node agents
 	query := `
-		SELECT id, name, port, game_type, version,
+		SELECT id, name, port, game_type, version, initialized,
 			agent_version, heartbeat_interval,
 			created_at, updated_at, started_at
 		FROM nodes ORDER BY created_at DESC
@@ -166,7 +166,7 @@ func (r *NodeRepository) List(ctx context.Context, _ *models.NodeStatus) ([]*mod
 		var startedAt sql.NullTime
 
 		if err := rows.Scan(
-			&node.ID, &node.Name, &node.Port, &node.GameType, &version,
+			&node.ID, &node.Name, &node.Port, &node.GameType, &version, &node.Initialized,
 			&agentVersion, &node.HeartbeatInterval,
 			&node.CreatedAt, &node.UpdatedAt, &startedAt,
 		); err != nil {
@@ -198,13 +198,13 @@ func (r *NodeRepository) Update(ctx context.Context, node *models.Node) error {
 
 	query := `
 		UPDATE nodes SET
-			name = $1, port = $2, game_type = $3, version = $4,
-			heartbeat_interval = $5, updated_at = $6, started_at = $7
-		WHERE id = $8
+			name = $1, port = $2, game_type = $3, version = $4, initialized = $5,
+			heartbeat_interval = $6, updated_at = $7, started_at = $8
+		WHERE id = $9
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
-		node.Name, node.Port, node.GameType, node.Version,
+		node.Name, node.Port, node.GameType, node.Version, node.Initialized,
 		node.HeartbeatInterval, node.UpdatedAt, node.StartedAt,
 		node.ID,
 	)

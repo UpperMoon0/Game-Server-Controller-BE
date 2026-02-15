@@ -315,18 +315,40 @@ func (h *NodeHandler) NodeAction(c *gin.Context) {
 
 	switch req.Action {
 	case "initialize":
-		// Initialize the node (install dependencies based on game type)
+		// Get the node to check its current status
+		node, err := h.nodeMgr.GetNode(id)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error":   "Node not found",
+				"message": err.Error(),
+			})
+			return
+		}
+
+		// Check if node is already initialized (tracked by node agent and stored in DB)
+		if node.Initialized {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":       "Node already initialized",
+				"message":     "Node has already been initialized",
+				"initialized": node.Initialized,
+				"game_type":   node.GameType,
+			})
+			return
+		}
+
+		// Check if node is currently initializing
+		if node.Status == models.NodeStatusInstalling {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Node is initializing",
+				"message": "Node is currently being initialized, please wait",
+				"status":  node.Status,
+			})
+			return
+		}
+
+		// Get game type from request or node
 		gameType := req.GameType
 		if gameType == "" {
-			// Get game type from node if not provided
-			node, err := h.nodeMgr.GetNode(id)
-			if err != nil {
-				c.JSON(http.StatusNotFound, gin.H{
-					"error":   "Node not found",
-					"message": err.Error(),
-				})
-				return
-			}
 			gameType = node.GameType
 		}
 
@@ -341,6 +363,14 @@ func (h *NodeHandler) NodeAction(c *gin.Context) {
 		}
 
 		if !result.Success {
+			// Check if the error is "already initialized"
+			if result.Message == "Node is already initialized" {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error":   "Node already initialized",
+					"message": result.Message,
+				})
+				return
+			}
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "Initialize command failed",
 				"message": result.Message,
@@ -348,9 +378,17 @@ func (h *NodeHandler) NodeAction(c *gin.Context) {
 			return
 		}
 
+		// Update node's initialized flag in database
+		node.Initialized = true
+		if err := h.nodeMgr.Update(node); err != nil {
+			h.logger.Error("Failed to update node initialized flag", zap.Error(err))
+			// Don't fail the request, just log the error
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"message":  "Node initialized successfully",
-			"game_type": gameType,
+			"message":     "Node initialized successfully",
+			"game_type":   gameType,
+			"initialized": true,
 		})
 
 	case "refresh":

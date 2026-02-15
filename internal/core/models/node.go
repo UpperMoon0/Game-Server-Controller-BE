@@ -29,6 +29,9 @@ type Node struct {
 	Version   string `json:"version" db:"version"`
 	Port      int    `json:"port" db:"port"`
 	
+	// Initialization state (stored in DB, managed by node agent)
+	Initialized bool `json:"initialized" db:"initialized"`
+	
 	// Agent Connection
 	AgentVersion      string `json:"agent_version" db:"agent_version"`
 	HeartbeatInterval int    `json:"heartbeat_interval" db:"heartbeat_interval"`
