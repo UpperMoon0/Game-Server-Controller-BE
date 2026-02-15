@@ -139,7 +139,7 @@ func (h *NodeHandler) CreateNode(c *gin.Context) {
 		NodeID:         nodeID,
 		NodeName:       req.Name,
 		Image:          h.cfg.NodeAgentImage,
-		ControllerAddr: h.cfg.GetGRPCAddress(),
+		ControllerAddr: h.cfg.GetGRPCAdvertiseAddress(),
 		GameTypes:      []string{req.GameType},
 		NetworkName:    h.cfg.NodeNetworkName,
 	}

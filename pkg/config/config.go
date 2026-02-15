@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/viper"
@@ -10,12 +11,19 @@ import (
 
 // Config holds all configuration for the controller service
 type Config struct {
+	mu sync.RWMutex // For thread-safe access to mutable fields
+
 	// Server Configuration
 	RESTHost    string `mapstructure:"REST_HOST"`
 	RESTPort    int    `mapstructure:"REST_PORT"`
 	GRPCHost    string `mapstructure:"GRPC_HOST"`
 	GRPCPort    int    `mapstructure:"GRPC_PORT"`
 	Environment string `mapstructure:"ENVIRONMENT"`
+
+	// Advertise Address (for Docker containers to connect)
+	// If empty, uses GRPCHost. For Docker, typically use "host.docker.internal" or host IP
+	// This field can be updated at runtime
+	GRPCAdvertiseHost string `mapstructure:"GRPC_ADVERTISE_HOST"`
 
 	// Database Configuration (PostgreSQL only)
 	DBUrl           string `mapstructure:"DB_URL"`       // Format: "host:port"
@@ -106,9 +114,42 @@ func (c *Config) GetRESTAddress() string {
 	return fmt.Sprintf("%s:%d", c.RESTHost, c.RESTPort)
 }
 
-// GetGRPCAddress returns the gRPC server address
+// GetGRPCAddress returns the gRPC server address (for binding)
 func (c *Config) GetGRPCAddress() string {
 	return fmt.Sprintf("%s:%d", c.GRPCHost, c.GRPCPort)
+}
+
+// GetGRPCAdvertiseAddress returns the gRPC address that node agents should connect to
+// This is different from GetGRPCAddress() because 0.0.0.0 is not reachable from containers
+func (c *Config) GetGRPCAdvertiseAddress() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	host := c.GRPCAdvertiseHost
+	if host == "" {
+		// If not set, try to detect the appropriate address
+		// For Docker, use "host.docker.internal" which resolves to the host
+		host = "host.docker.internal"
+	}
+	return fmt.Sprintf("%s:%d", host, c.GRPCPort)
+}
+
+// GetGRPCAdvertiseHost returns the advertise host (without port)
+func (c *Config) GetGRPCAdvertiseHost() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	if c.GRPCAdvertiseHost == "" {
+		return "host.docker.internal"
+	}
+	return c.GRPCAdvertiseHost
+}
+
+// SetGRPCAdvertiseHost sets the advertise host at runtime
+func (c *Config) SetGRPCAdvertiseHost(host string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.GRPCAdvertiseHost = host
 }
 
 // GetDatabaseDSN returns the PostgreSQL connection string

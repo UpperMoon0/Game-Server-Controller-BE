@@ -112,6 +112,10 @@ func (s *Server) registerRoutes() {
 
 		// Game types endpoint
 		v1.GET("/game-types", s.getGameTypes)
+
+		// Config endpoints
+		v1.GET("/config", s.getConfig)
+		v1.PUT("/config", s.updateConfig)
 	}
 }
 
@@ -180,6 +184,41 @@ func (s *Server) getGameTypes(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"game_types": gameTypes,
+	})
+}
+
+// getConfig returns the current controller configuration
+func (s *Server) getConfig(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"grpc_advertise_host": s.cfg.GetGRPCAdvertiseHost(),
+		"grpc_port":           s.cfg.GRPCPort,
+		"grpc_advertise_address": s.cfg.GetGRPCAdvertiseAddress(),
+	})
+}
+
+// updateConfig updates the controller configuration
+func (s *Server) updateConfig(c *gin.Context) {
+	var req struct {
+		GRPCAdvertiseHost *string `json:"grpc_advertise_host"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid request",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	if req.GRPCAdvertiseHost != nil {
+		s.cfg.SetGRPCAdvertiseHost(*req.GRPCAdvertiseHost)
+		s.logger.Info("Updated gRPC advertise host", zap.String("host", *req.GRPCAdvertiseHost))
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":              "Configuration updated",
+		"grpc_advertise_host":  s.cfg.GetGRPCAdvertiseHost(),
+		"grpc_advertise_address": s.cfg.GetGRPCAdvertiseAddress(),
 	})
 }
 
