@@ -34,14 +34,12 @@ func (r *NodeRepository) Create(ctx context.Context, node *models.Node) error {
 	query := `
 		INSERT INTO nodes (
 			id, name, port, status, game_type, version,
-			player_count, cpu_usage, memory_usage, uptime_seconds,
 			agent_version, heartbeat_interval, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
 		node.ID, node.Name, node.Port, node.Status, node.GameType, node.Version,
-		node.PlayerCount, node.CPUUsage, node.MemoryUsage, node.UptimeSeconds,
 		node.AgentVersion, node.HeartbeatInterval,
 		node.CreatedAt, node.UpdatedAt,
 	)
@@ -61,7 +59,6 @@ func (r *NodeRepository) Create(ctx context.Context, node *models.Node) error {
 func (r *NodeRepository) GetByID(ctx context.Context, id string) (*models.Node, error) {
 	query := `
 		SELECT id, name, port, status, game_type, version,
-			player_count, cpu_usage, memory_usage, uptime_seconds,
 			agent_version, heartbeat_interval, last_heartbeat,
 			created_at, updated_at, started_at
 		FROM nodes WHERE id = $1
@@ -75,7 +72,6 @@ func (r *NodeRepository) GetByID(ctx context.Context, id string) (*models.Node, 
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&node.ID, &node.Name, &node.Port, &node.Status, &node.GameType, &version,
-		&node.PlayerCount, &node.CPUUsage, &node.MemoryUsage, &node.UptimeSeconds,
 		&agentVersion, &node.HeartbeatInterval, &lastHeartbeat,
 		&node.CreatedAt, &node.UpdatedAt, &startedAt,
 	)
@@ -107,7 +103,6 @@ func (r *NodeRepository) GetByID(ctx context.Context, id string) (*models.Node, 
 func (r *NodeRepository) GetByName(ctx context.Context, name string) (*models.Node, error) {
 	query := `
 		SELECT id, name, port, status, game_type, version,
-			player_count, cpu_usage, memory_usage, uptime_seconds,
 			agent_version, heartbeat_interval, last_heartbeat,
 			created_at, updated_at, started_at
 		FROM nodes WHERE name = $1
@@ -121,7 +116,6 @@ func (r *NodeRepository) GetByName(ctx context.Context, name string) (*models.No
 
 	err := r.db.QueryRowContext(ctx, query, name).Scan(
 		&node.ID, &node.Name, &node.Port, &node.Status, &node.GameType, &version,
-		&node.PlayerCount, &node.CPUUsage, &node.MemoryUsage, &node.UptimeSeconds,
 		&agentVersion, &node.HeartbeatInterval, &lastHeartbeat,
 		&node.CreatedAt, &node.UpdatedAt, &startedAt,
 	)
@@ -157,7 +151,6 @@ func (r *NodeRepository) List(ctx context.Context, status *models.NodeStatus) ([
 	if status != nil {
 		query = `
 			SELECT id, name, port, status, game_type, version,
-				player_count, cpu_usage, memory_usage, uptime_seconds,
 				agent_version, heartbeat_interval, last_heartbeat,
 				created_at, updated_at, started_at
 			FROM nodes WHERE status = $1 ORDER BY created_at DESC
@@ -166,7 +159,6 @@ func (r *NodeRepository) List(ctx context.Context, status *models.NodeStatus) ([
 	} else {
 		query = `
 			SELECT id, name, port, status, game_type, version,
-				player_count, cpu_usage, memory_usage, uptime_seconds,
 				agent_version, heartbeat_interval, last_heartbeat,
 				created_at, updated_at, started_at
 			FROM nodes ORDER BY created_at DESC
@@ -189,7 +181,6 @@ func (r *NodeRepository) List(ctx context.Context, status *models.NodeStatus) ([
 
 		if err := rows.Scan(
 			&node.ID, &node.Name, &node.Port, &node.Status, &node.GameType, &version,
-			&node.PlayerCount, &node.CPUUsage, &node.MemoryUsage, &node.UptimeSeconds,
 			&agentVersion, &node.HeartbeatInterval, &lastHeartbeat,
 			&node.CreatedAt, &node.UpdatedAt, &startedAt,
 		); err != nil {
@@ -222,14 +213,12 @@ func (r *NodeRepository) Update(ctx context.Context, node *models.Node) error {
 	query := `
 		UPDATE nodes SET
 			name = $1, port = $2, status = $3, game_type = $4, version = $5,
-			player_count = $6, cpu_usage = $7, memory_usage = $8, uptime_seconds = $9,
-			heartbeat_interval = $10, last_heartbeat = $11, updated_at = $12, started_at = $13
-		WHERE id = $14
+			heartbeat_interval = $6, last_heartbeat = $7, updated_at = $8, started_at = $9
+		WHERE id = $10
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
 		node.Name, node.Port, node.Status, node.GameType, node.Version,
-		node.PlayerCount, node.CPUUsage, node.MemoryUsage, node.UptimeSeconds,
 		node.HeartbeatInterval, node.LastHeartbeat, node.UpdatedAt, node.StartedAt,
 		node.ID,
 	)
@@ -248,18 +237,6 @@ func (r *NodeRepository) UpdateHeartbeat(ctx context.Context, id string, heartbe
 	_, err := r.db.ExecContext(ctx, query, heartbeat, time.Now(), id)
 	if err != nil {
 		return fmt.Errorf("failed to update heartbeat: %w", err)
-	}
-
-	return nil
-}
-
-// UpdateMetrics updates the runtime metrics for a node
-func (r *NodeRepository) UpdateMetrics(ctx context.Context, id string, playerCount int, cpuUsage float64, memoryUsage int64, uptimeSeconds int64) error {
-	query := `UPDATE nodes SET player_count = $1, cpu_usage = $2, memory_usage = $3, uptime_seconds = $4, updated_at = $5 WHERE id = $6`
-
-	_, err := r.db.ExecContext(ctx, query, playerCount, cpuUsage, memoryUsage, uptimeSeconds, time.Now(), id)
-	if err != nil {
-		return fmt.Errorf("failed to update metrics: %w", err)
 	}
 
 	return nil

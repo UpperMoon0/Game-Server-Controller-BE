@@ -22,31 +22,25 @@ const (
 
 // Node represents a game server node instance
 type Node struct {
-	ID               string        `json:"id" db:"id"`
-	Name             string        `json:"name" db:"name"`
-	Status           NodeStatus    `json:"status" db:"status"`
-	GameType         string        `json:"game_type" db:"game_type"`
-	Version          string        `json:"version" db:"version"`
-	Port             int           `json:"port" db:"port"`
-	
-	// Runtime Metrics
-	PlayerCount      int           `json:"player_count" db:"player_count"`
-	CPUUsage         float64       `json:"cpu_usage" db:"cpu_usage"`
-	MemoryUsage      int64         `json:"memory_usage" db:"memory_usage"`
-	UptimeSeconds    int64         `json:"uptime_seconds" db:"uptime_seconds"`
+	ID        string     `json:"id" db:"id"`
+	Name      string     `json:"name" db:"name"`
+	Status    NodeStatus `json:"status" db:"status"`
+	GameType  string     `json:"game_type" db:"game_type"`
+	Version   string     `json:"version" db:"version"`
+	Port      int        `json:"port" db:"port"`
 	
 	// Agent Connection
-	AgentVersion     string        `json:"agent_version" db:"agent_version"`
-	HeartbeatInterval int          `json:"heartbeat_interval" db:"heartbeat_interval"`
-	LastHeartbeat    time.Time     `json:"last_heartbeat" db:"last_heartbeat"`
+	AgentVersion      string `json:"agent_version" db:"agent_version"`
+	HeartbeatInterval int    `json:"heartbeat_interval" db:"heartbeat_interval"`
+	LastHeartbeat     time.Time `json:"last_heartbeat" db:"last_heartbeat"`
 	
 	// Timestamps
-	CreatedAt        time.Time     `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at" db:"updated_at"`
-	StartedAt        sql.NullTime   `json:"started_at" db:"started_at"`
+	CreatedAt time.Time     `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time     `json:"updated_at" db:"updated_at"`
+	StartedAt sql.NullTime  `json:"started_at" db:"started_at"`
 }
 
-// NodeMetrics represents real-time metrics for a node
+// NodeMetrics represents real-time metrics for a node (fetched from node agent, not stored in DB)
 type NodeMetrics struct {
 	NodeID             string    `json:"node_id"`
 	PlayerCount        int       `json:"player_count"`
@@ -67,21 +61,21 @@ type CreateNodeRequest struct {
 
 // UpdateNodeRequest represents a request to update node configuration
 type UpdateNodeRequest struct {
-	Name              *string      `json:"name"`
-	GameType          *string      `json:"game_type"`
-	Version           *string      `json:"version"`
-	Port              *int         `json:"port"`
-	Status            *NodeStatus  `json:"status"`
-	HeartbeatInterval *int         `json:"heartbeat_interval"`
+	Name              *string     `json:"name"`
+	GameType          *string     `json:"game_type"`
+	Version           *string     `json:"version"`
+	Port              *int        `json:"port"`
+	Status            *NodeStatus `json:"status"`
+	HeartbeatInterval *int        `json:"heartbeat_interval"`
 }
 
 // NodeAction represents an action to perform on a node
 type NodeAction string
 
 const (
-	NodeActionStart    NodeAction = "start"
-	NodeActionStop     NodeAction = "stop"
-	NodeActionRestart  NodeAction = "restart"
+	NodeActionStart     NodeAction = "start"
+	NodeActionStop      NodeAction = "stop"
+	NodeActionRestart   NodeAction = "restart"
 	NodeActionReinstall NodeAction = "reinstall"
 )
 
