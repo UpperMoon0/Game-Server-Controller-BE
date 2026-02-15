@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/docker/docker/api/types/container"
@@ -58,8 +59,15 @@ func (cm *ContainerManager) CreateNodeContainer(ctx context.Context, cfg *NodeCo
 	if err != nil {
 		return "", fmt.Errorf("failed to pull image %s: %w", cfg.Image, err)
 	}
-	// Close the reader to ensure the pull is complete
+	// Must read all data from the reader to ensure the pull is complete
+	// Just closing the reader doesn't wait for the pull to finish
+	_, err = io.Copy(io.Discard, reader)
+	if err != nil {
+		reader.Close()
+		return "", fmt.Errorf("failed to complete image pull: %w", err)
+	}
 	reader.Close()
+	cm.logger.Info("Successfully pulled image", zap.String("image", cfg.Image))
 
 	// Create volumes first
 	volumeNames := cm.volumeMgr.GetNodeVolumeNames(cfg.NodeID)
