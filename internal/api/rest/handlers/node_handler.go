@@ -422,7 +422,7 @@ func (h *NodeHandler) NodeAction(c *gin.Context) {
 		})
 
 	case "update-image":
-		// Update the node container to a new image
+		// Update the node container to the latest image from config
 		if h.containerMgr == nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "Container manager not available",
@@ -431,13 +431,10 @@ func (h *NodeHandler) NodeAction(c *gin.Context) {
 			return
 		}
 
-		// Get the image from request or use default from config
-		newImage := req.Image
-		if newImage == "" {
-			newImage = h.cfg.NodeAgentImage
-		}
+		// Always use the image from config
+		latestImage := h.cfg.NodeAgentImage
 
-		newContainerID, err := h.containerMgr.UpdateNodeContainer(c.Request.Context(), id, newImage)
+		result, err := h.containerMgr.UpdateNodeContainer(c.Request.Context(), id, latestImage)
 		if err != nil {
 			h.logger.Error("Failed to update node container image", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -447,10 +444,26 @@ func (h *NodeHandler) NodeAction(c *gin.Context) {
 			return
 		}
 
+		if result.Skipped {
+			c.JSON(http.StatusOK, gin.H{
+				"updated":      false,
+				"skipped":      true,
+				"message":      result.Message,
+				"image":        result.NewImage,
+				"old_digest":   result.OldDigest,
+				"new_digest":   result.NewDigest,
+			})
+			return
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"message":       "Node container updated successfully",
-			"new_image":     newImage,
-			"new_container_id": newContainerID,
+			"updated":          true,
+			"skipped":          false,
+			"message":          result.Message,
+			"new_image":        result.NewImage,
+			"new_container_id": result.ContainerID,
+			"old_digest":       result.OldDigest,
+			"new_digest":       result.NewDigest,
 		})
 
 	default:

@@ -16,6 +16,18 @@ import (
 	"go.uber.org/zap"
 )
 
+// UpdateResult holds the result of a container update operation
+type UpdateResult struct {
+	Updated      bool   // Whether the container was actually updated
+	Skipped      bool   // Whether the update was skipped (already up-to-date)
+	Message      string // Human-readable message
+	ContainerID  string // New container ID if updated
+	OldImage     string // Previous image
+	NewImage     string // New image (same as old if skipped)
+	OldDigest    string // Previous image digest
+	NewDigest    string // New image digest
+}
+
 // ContainerManager manages Docker containers for game server nodes
 type ContainerManager struct {
 	client     *client.Client
@@ -311,47 +323,86 @@ func (cm *ContainerManager) findContainerByNodeID(ctx context.Context, nodeID st
 	return containers[0].ID, nil
 }
 
-// UpdateNodeContainer updates a node container to a new image while preserving data
-func (cm *ContainerManager) UpdateNodeContainer(ctx context.Context, nodeID string, newImage string) (string, error) {
+// UpdateNodeContainer updates a node container to the latest image while preserving data
+// Returns UpdateResult indicating whether the update was performed or skipped
+func (cm *ContainerManager) UpdateNodeContainer(ctx context.Context, nodeID string, latestImage string) (*UpdateResult, error) {
 	// Find the existing container
 	containerID, err := cm.findContainerByNodeID(ctx, nodeID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if containerID == "" {
-		return "", fmt.Errorf("container not found for node: %s", nodeID)
+		return nil, fmt.Errorf("container not found for node: %s", nodeID)
 	}
 
 	// Inspect the existing container to get its configuration
 	info, err := cm.client.ContainerInspect(ctx, containerID)
 	if err != nil {
-		return "", fmt.Errorf("failed to inspect container: %w", err)
+		return nil, fmt.Errorf("failed to inspect container: %w", err)
 	}
 
-	cm.logger.Info("Updating node container to new image",
+	currentImage := info.Config.Image
+
+	cm.logger.Info("Checking for node container image update",
 		zap.String("node_id", nodeID),
-		zap.String("old_image", info.Config.Image),
-		zap.String("new_image", newImage),
+		zap.String("current_image", currentImage),
+		zap.String("latest_image", latestImage),
 		zap.String("container_id", containerID))
 
-	// Pull the new image
-	cm.logger.Info("Pulling new image", zap.String("image", newImage))
-	reader, err := cm.client.ImagePull(ctx, newImage, image.PullOptions{})
+	// Get the digest of the currently running image
+	currentDigest, err := cm.getImageDigest(ctx, currentImage)
 	if err != nil {
-		return "", fmt.Errorf("failed to pull image %s: %w", newImage, err)
+		cm.logger.Warn("Failed to get current image digest, proceeding with update", zap.Error(err))
+		currentDigest = ""
+	}
+
+	// Pull the latest image
+	cm.logger.Info("Pulling latest image", zap.String("image", latestImage))
+	reader, err := cm.client.ImagePull(ctx, latestImage, image.PullOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to pull image %s: %w", latestImage, err)
 	}
 	_, err = io.Copy(io.Discard, reader)
 	if err != nil {
 		reader.Close()
-		return "", fmt.Errorf("failed to complete image pull: %w", err)
+		return nil, fmt.Errorf("failed to complete image pull: %w", err)
 	}
 	reader.Close()
-	cm.logger.Info("Successfully pulled new image", zap.String("image", newImage))
+	cm.logger.Info("Successfully pulled latest image", zap.String("image", latestImage))
+
+	// Get the digest of the newly pulled image
+	latestDigest, err := cm.getImageDigest(ctx, latestImage)
+	if err != nil {
+		cm.logger.Warn("Failed to get latest image digest", zap.Error(err))
+		latestDigest = ""
+	}
+
+	// Compare digests - skip update if they match
+	if currentDigest != "" && latestDigest != "" && currentDigest == latestDigest {
+		cm.logger.Info("Image is already up-to-date, skipping update",
+			zap.String("node_id", nodeID),
+			zap.String("digest", currentDigest))
+
+		return &UpdateResult{
+			Updated:   false,
+			Skipped:   true,
+			Message:   "Container is already running the latest image",
+			OldImage:  currentImage,
+			NewImage:  latestImage,
+			OldDigest: currentDigest,
+			NewDigest: latestDigest,
+		}, nil
+	}
+
+	cm.logger.Info("Image update required",
+		zap.String("node_id", nodeID),
+		zap.String("old_digest", currentDigest),
+		zap.String("new_digest", latestDigest))
 
 	// Stop the container
 	timeout := 30
 	if err := cm.client.ContainerStop(ctx, containerID, container.StopOptions{Timeout: &timeout}); err != nil {
-		return "", fmt.Errorf("failed to stop container: %w", err)
+		return nil, fmt.Errorf("failed to stop container: %w", err)
 	}
 	cm.logger.Info("Stopped container for update", zap.String("container_id", containerID))
 
@@ -386,7 +437,7 @@ func (cm *ContainerManager) UpdateNodeContainer(ctx context.Context, nodeID stri
 	if err := cm.client.ContainerRemove(ctx, containerID, container.RemoveOptions{
 		Force: true,
 	}); err != nil {
-		return "", fmt.Errorf("failed to remove old container: %w", err)
+		return nil, fmt.Errorf("failed to remove old container: %w", err)
 	}
 	cm.logger.Info("Removed old container", zap.String("container_id", containerID))
 
@@ -398,7 +449,7 @@ func (cm *ContainerManager) UpdateNodeContainer(ctx context.Context, nodeID stri
 
 	// Container configuration
 	containerConfig := &container.Config{
-		Image:       newImage,
+		Image:       latestImage,
 		Env:         envVars,
 		Labels:      labels,
 		ExposedPorts: nat.PortSet{
@@ -437,23 +488,118 @@ func (cm *ContainerManager) UpdateNodeContainer(ctx context.Context, nodeID stri
 		containerName,
 	)
 	if err != nil {
-		return "", fmt.Errorf("failed to create new container: %w", err)
+		return nil, fmt.Errorf("failed to create new container: %w", err)
 	}
 
 	// Start the new container
 	if err := cm.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		// Clean up container on start failure
 		_ = cm.client.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
-		return "", fmt.Errorf("failed to start new container: %w", err)
+		return nil, fmt.Errorf("failed to start new container: %w", err)
 	}
 
 	cm.logger.Info("Node container updated successfully",
 		zap.String("node_id", nodeID),
 		zap.String("old_container_id", containerID),
 		zap.String("new_container_id", resp.ID),
-		zap.String("new_image", newImage))
+		zap.String("new_image", latestImage))
 
-	return resp.ID, nil
+	return &UpdateResult{
+		Updated:     true,
+		Skipped:     false,
+		Message:     "Container updated successfully",
+		ContainerID: resp.ID,
+		OldImage:    currentImage,
+		NewImage:    latestImage,
+		OldDigest:   currentDigest,
+		NewDigest:   latestDigest,
+	}, nil
+}
+
+// getImageDigest gets the digest of an image
+func (cm *ContainerManager) getImageDigest(ctx context.Context, imageName string) (string, error) {
+	// Inspect the image to get its digest
+	imgInspect, _, err := cm.client.ImageInspectWithRaw(ctx, imageName)
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect image %s: %w", imageName, err)
+	}
+
+	// The digest is in the RepoDigests field for pulled images
+	// Format: repo@sha256:digest
+	if len(imgInspect.RepoDigests) > 0 {
+		// Extract just the digest part
+		for _, repoDigest := range imgInspect.RepoDigests {
+			if idx := len(imageName); idx < len(repoDigest) && repoDigest[:idx] == imageName {
+				return repoDigest[idx+1:], nil // +1 to skip the @ symbol
+			}
+			// Try without registry prefix
+			if idx := findDigestInRepoDigest(repoDigest, imageName); idx != "" {
+				return idx, nil
+			}
+		}
+		// Return the digest from the first RepoDigest if image name doesn't match
+		for _, repoDigest := range imgInspect.RepoDigests {
+			if atIdx := findAtSymbol(repoDigest); atIdx >= 0 {
+				return repoDigest[atIdx+1:], nil
+			}
+		}
+	}
+
+	// Fallback to the image ID (which is a digest of the manifest)
+	if imgInspect.ID != "" {
+		// Image ID format: sha256:digest
+		if len(imgInspect.ID) > 7 && imgInspect.ID[:7] == "sha256:" {
+			return imgInspect.ID, nil
+		}
+	}
+
+	return "", fmt.Errorf("could not find digest for image %s", imageName)
+}
+
+// findDigestInRepoDigest extracts digest from repo digest string
+func findDigestInRepoDigest(repoDigest, imageName string) string {
+	// repoDigest format: registry/repo@sha256:digest or repo@sha256:digest
+	// imageName could be: repo:tag or repo or registry/repo:tag
+	
+	// Strip tag from imageName if present
+	baseImageName := imageName
+	for i := 0; i < len(imageName); i++ {
+		if imageName[i] == ':' && i > 0 {
+			// Check if this is not a registry port (has / before :)
+			hasSlash := false
+			for j := 0; j < i; j++ {
+				if imageName[j] == '/' {
+					hasSlash = true
+					break
+				}
+			}
+			if hasSlash || i < len(imageName)-1 {
+				// This is a tag, not a port
+				baseImageName = imageName[:i]
+				break
+			}
+		}
+	}
+	
+	atIdx := findAtSymbol(repoDigest)
+	if atIdx >= 0 {
+		// Check if the repo part matches
+		repoPart := repoDigest[:atIdx]
+		if repoPart == baseImageName || repoPart == imageName {
+			return repoDigest[atIdx+1:]
+		}
+	}
+	return ""
+}
+
+// findAtSymbol finds the @ symbol in a repo digest string
+func findAtSymbol(s string) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] == '@' {
+			return i
+		}
+	}
+	return -1
 }
 
 // RestartNodeContainer restarts a node container
