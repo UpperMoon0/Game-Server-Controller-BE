@@ -215,7 +215,14 @@ func (s *Server) updateConfig(c *gin.Context) {
 	}
 
 	if req.GRPCAdvertiseHost != nil {
-		s.cfg.SetGRPCAdvertiseHost(*req.GRPCAdvertiseHost)
+		if err := s.cfg.SetGRPCAdvertiseHost(*req.GRPCAdvertiseHost); err != nil {
+			s.logger.Error("Failed to save gRPC advertise host", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "Failed to save configuration",
+				"message": err.Error(),
+			})
+			return
+		}
 		s.logger.Info("Updated gRPC advertise host", zap.String("host", *req.GRPCAdvertiseHost))
 	}
 

@@ -2,58 +2,63 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // Config holds all configuration for the controller service
 type Config struct {
 	mu sync.RWMutex // For thread-safe access to mutable fields
 
+	// Config file path for saving changes
+	configPath string
+
 	// Server Configuration
-	RESTHost    string `mapstructure:"REST_HOST"`
-	RESTPort    int    `mapstructure:"REST_PORT"`
-	GRPCHost    string `mapstructure:"GRPC_HOST"`
-	GRPCPort    int    `mapstructure:"GRPC_PORT"`
-	Environment string `mapstructure:"ENVIRONMENT"`
+	RESTHost    string `mapstructure:"REST_HOST" yaml:"rest_host"`
+	RESTPort    int    `mapstructure:"REST_PORT" yaml:"rest_port"`
+	GRPCHost    string `mapstructure:"GRPC_HOST" yaml:"grpc_host"`
+	GRPCPort    int    `mapstructure:"GRPC_PORT" yaml:"grpc_port"`
+	Environment string `mapstructure:"ENVIRONMENT" yaml:"environment"`
 
 	// Advertise Address (for Docker containers to connect)
 	// If empty, uses GRPCHost. For Docker, typically use "host.docker.internal" or host IP
 	// This field can be updated at runtime
-	GRPCAdvertiseHost string `mapstructure:"GRPC_ADVERTISE_HOST"`
+	GRPCAdvertiseHost string `mapstructure:"GRPC_ADVERTISE_HOST" yaml:"grpc_advertise_host"`
 
 	// Database Configuration (PostgreSQL only)
-	DBUrl           string `mapstructure:"DB_URL"`       // Format: "host:port"
-	DatabaseName    string `mapstructure:"DATABASE_NAME"`
-	DatabaseUser    string `mapstructure:"DATABASE_USER"`
-	DatabasePassword string `mapstructure:"DATABASE_PASSWORD"`
-	DatabaseSSLMode string `mapstructure:"DATABASE_SSL_MODE"`
+	DBUrl           string `mapstructure:"DB_URL" yaml:"db_url"`
+	DatabaseName    string `mapstructure:"DATABASE_NAME" yaml:"database_name"`
+	DatabaseUser    string `mapstructure:"DATABASE_USER" yaml:"database_user"`
+	DatabasePassword string `mapstructure:"DATABASE_PASSWORD" yaml:"database_password"`
+	DatabaseSSLMode string `mapstructure:"DATABASE_SSL_MODE" yaml:"database_ssl_mode"`
 
 	// Node Agent Configuration
-	NodeAgentImage  string `mapstructure:"NODE_AGENT_IMAGE"`
-	NodeNetworkName string `mapstructure:"NODE_NETWORK_NAME"`
+	NodeAgentImage  string `mapstructure:"NODE_AGENT_IMAGE" yaml:"node_agent_image"`
+	NodeNetworkName string `mapstructure:"NODE_NETWORK_NAME" yaml:"node_network_name"`
 
 	// Node Configuration
-	DefaultHeartbeatInterval int `mapstructure:"DEFAULT_HEARTBEAT_INTERVAL"`
-	NodeTimeout              int `mapstructure:"NODE_TIMEOUT"`
+	DefaultHeartbeatInterval int `mapstructure:"DEFAULT_HEARTBEAT_INTERVAL" yaml:"default_heartbeat_interval"`
+	NodeTimeout              int `mapstructure:"NODE_TIMEOUT" yaml:"node_timeout"`
 
 	// Metrics Configuration
-	MetricsEnabled       bool   `mapstructure:"METRICS_ENABLED"`
-	MetricsInterval      int    `mapstructure:"METRICS_INTERVAL"`
-	MetricsRetentionDays  int   `mapstructure:"METRICS_RETENTION_DAYS"`
+	MetricsEnabled       bool   `mapstructure:"METRICS_ENABLED" yaml:"metrics_enabled"`
+	MetricsInterval      int    `mapstructure:"METRICS_INTERVAL" yaml:"metrics_interval"`
+	MetricsRetentionDays  int   `mapstructure:"METRICS_RETENTION_DAYS" yaml:"metrics_retention_days"`
 
 	// Logging Configuration
-	LogLevel    string `mapstructure:"LOG_LEVEL"`
-	LogFormat   string `mapstructure:"LOG_FORMAT"`
-	LogFilePath string `mapstructure:"LOG_FILE_PATH"`
+	LogLevel    string `mapstructure:"LOG_LEVEL" yaml:"log_level"`
+	LogFormat   string `mapstructure:"LOG_FORMAT" yaml:"log_format"`
+	LogFilePath string `mapstructure:"LOG_FILE_PATH" yaml:"log_file_path"`
 
 	// Clustering
-	ClusterEnabled    bool   `mapstructure:"CLUSTER_ENABLED"`
-	ClusterNodeID    string `mapstructure:"CLUSTER_NODE_ID"`
-	ClusterAddress   string `mapstructure:"CLUSTER_ADDRESS"`
+	ClusterEnabled    bool   `mapstructure:"CLUSTER_ENABLED" yaml:"cluster_enabled"`
+	ClusterNodeID    string `mapstructure:"CLUSTER_NODE_ID" yaml:"cluster_node_id"`
+	ClusterAddress   string `mapstructure:"CLUSTER_ADDRESS" yaml:"cluster_address"`
 }
 
 // Load reads configuration from file and environment variables
@@ -81,8 +86,10 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("CLUSTER_ENABLED", false)
 
 	// Set config file
+	var resolvedConfigPath string
 	if configPath != "" {
 		v.SetConfigFile(configPath)
+		resolvedConfigPath = configPath
 	} else {
 		v.SetConfigName("config")
 		v.SetConfigType("yaml")
@@ -101,10 +108,18 @@ func Load(configPath string) (*Config, error) {
 		}
 	}
 
+	// Get the actual config file path used
+	if resolvedConfigPath == "" {
+		resolvedConfigPath = v.ConfigFileUsed()
+	}
+
 	var config Config
 	if err := v.Unmarshal(&config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
+
+	// Store the config file path for saving later
+	config.configPath = resolvedConfigPath
 
 	return &config, nil
 }
@@ -145,11 +160,69 @@ func (c *Config) GetGRPCAdvertiseHost() string {
 	return c.GRPCAdvertiseHost
 }
 
-// SetGRPCAdvertiseHost sets the advertise host at runtime
-func (c *Config) SetGRPCAdvertiseHost(host string) {
+// SetGRPCAdvertiseHost sets the advertise host at runtime and persists to config file
+func (c *Config) SetGRPCAdvertiseHost(host string) error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.GRPCAdvertiseHost = host
+	c.mu.Unlock()
+	
+	// Save to config file
+	return c.Save()
+}
+
+// Save writes the current configuration to the config file
+func (c *Config) Save() error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	if c.configPath == "" {
+		return fmt.Errorf("no config file path set")
+	}
+
+	// Read existing config file to preserve comments and structure
+	data, err := os.ReadFile(c.configPath)
+	if err != nil {
+		// If file doesn't exist, create new one
+		if os.IsNotExist(err) {
+			return c.writeNewConfig()
+		}
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	// Parse as YAML map to preserve structure
+	var rawConfig map[string]interface{}
+	if err := yaml.Unmarshal(data, &rawConfig); err != nil {
+		return fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	// Update the grpc_advertise_host field
+	rawConfig["grpc_advertise_host"] = c.GRPCAdvertiseHost
+
+	// Write back to file
+	outData, err := yaml.Marshal(rawConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(c.configPath, outData, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
+}
+
+// writeNewConfig creates a new config file with current settings
+func (c *Config) writeNewConfig() error {
+	outData, err := yaml.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(c.configPath, outData, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
 }
 
 // GetDatabaseDSN returns the PostgreSQL connection string
