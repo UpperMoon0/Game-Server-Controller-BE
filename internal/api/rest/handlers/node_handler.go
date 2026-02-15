@@ -161,6 +161,19 @@ func (h *NodeHandler) CreateNode(c *gin.Context) {
 		zap.String("container_id", containerID),
 		zap.String("name", req.Name))
 
+	// Create node in database with port and game type
+	nodeModel := &models.Node{
+		ID:        nodeID,
+		Name:      req.Name,
+		Port:      port,
+		GameType:  req.GameType,
+		Status:    models.NodeStatusStopped, // Will be updated when agent connects
+	}
+	if err := h.nodeMgr.CreateNode(ctx, nodeModel); err != nil {
+		h.logger.Error("Failed to create node in database", zap.Error(err))
+		// Don't fail the request since container is already running
+	}
+
 	// Return the node info - the node agent will register itself via gRPC
 	c.JSON(http.StatusCreated, gin.H{
 		"node": gin.H{

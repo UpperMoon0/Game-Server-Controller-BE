@@ -108,6 +108,15 @@ func (cm *ContainerManager) CreateNodeContainer(ctx context.Context, cfg *NodeCo
 		"ENVIRONMENT=production",
 	}
 
+	// Add game types as environment variable if provided
+	if len(cfg.GameTypes) > 0 {
+		gameTypesStr := cfg.GameTypes[0]
+		for i := 1; i < len(cfg.GameTypes); i++ {
+			gameTypesStr += "," + cfg.GameTypes[i]
+		}
+		envVars = append(envVars, fmt.Sprintf("GAME_TYPES=%s", gameTypesStr))
+	}
+
 	// Container name
 	containerName := fmt.Sprintf("game-server-node-%s", cfg.NodeID)
 

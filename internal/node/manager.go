@@ -139,11 +139,32 @@ func (m *Manager) RegisterNode(ctx context.Context, node *models.Node) error {
 			return fmt.Errorf("failed to create node in database: %w", err)
 		}
 	} else {
+		// Preserve existing data that should not be overwritten by agent registration
+		if node.GameType == "" && existingNode.GameType != "" {
+			node.GameType = existingNode.GameType
+		}
+		if node.Port == 0 && existingNode.Port != 0 {
+			node.Port = existingNode.Port
+		}
+		// Preserve name from database if it's more descriptive than hostname
+		if existingNode.Name != "" && existingNode.Name != node.ID[:8] {
+			node.Name = existingNode.Name
+		}
+		// Preserve initialized flag
+		node.Initialized = existingNode.Initialized
+		
 		// Update status to running in database
 		node.Status = models.NodeStatusRunning
 		if err := m.nodeRepo.Update(ctx, node); err != nil {
 			m.logger.Error("Failed to update node status", zap.Error(err))
 		}
+		
+		// Update in-memory state with merged data
+		m.mu.Lock()
+		if state, exists := m.nodes[node.ID]; exists {
+			state.Node = node
+		}
+		m.mu.Unlock()
 	}
 
 	return nil
