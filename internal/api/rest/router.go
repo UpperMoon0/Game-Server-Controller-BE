@@ -107,6 +107,10 @@ func (s *Server) registerRoutes() {
 		nodeHandler := handlers.NewNodeHandler(s.nodeMgr, s.containerMgr, s.cfg, s.logger)
 		nodeHandler.RegisterRoutes(v1)
 
+		// Register file handler
+		fileHandler := handlers.NewFileHandler(s.nodeMgr, s.cfg, s.logger)
+		fileHandler.RegisterRoutes(v1)
+
 		// Metrics endpoint
 		v1.GET("/metrics", s.getClusterMetrics)
 

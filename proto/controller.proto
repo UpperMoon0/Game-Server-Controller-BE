@@ -45,10 +45,43 @@ service ServerService {
     rpc StreamServerLogs(StreamLogsRequest) returns (stream LogEntry);
 }
 
-// Metrics Service - Handles real-time metrics collection
-service MetricsService {
-    // Stream node and server metrics
-    rpc StreamMetrics(StreamMetricsRequest) returns (stream NodeMetrics);
+// File Service - Handles file operations on nodes
+service FileService {
+    // List files in a directory
+    rpc ListFiles(FileListRequest) returns (FileListResponse);
+    
+    // Create a file or directory
+    rpc CreateFile(FileCreateRequest) returns (FileOperationResponse);
+    
+    // Delete a file or directory
+    rpc DeleteFile(FileDeleteRequest) returns (FileOperationResponse);
+    
+    // Rename a file or directory
+    rpc RenameFile(FileRenameRequest) returns (FileOperationResponse);
+    
+    // Move a file or directory
+    rpc MoveFile(FileMoveRequest) returns (FileOperationResponse);
+    
+    // Copy a file or directory
+    rpc CopyFile(FileCopyRequest) returns (FileOperationResponse);
+    
+    // Read file content
+    rpc ReadFile(FileReadRequest) returns (FileReadResponse);
+    
+    // Write file content
+    rpc WriteFile(FileWriteRequest) returns (FileOperationResponse);
+    
+    // Check if file exists
+    rpc FileExists(FileExistsRequest) returns (FileExistsResponse);
+    
+    // Create directory
+    rpc Mkdir(FileMkdirRequest) returns (FileOperationResponse);
+    
+    // Zip files/folders
+    rpc ZipFiles(FileZipRequest) returns (FileOperationResponse);
+    
+    // Unzip archive
+    rpc UnzipFiles(FileUnzipRequest) returns (FileOperationResponse);
 }
 
 // Message Definitions
@@ -80,6 +113,8 @@ message NodeEvent {
         MetricsSnapshot metrics = 6;
         LogEntry log = 7;
         ErrorInfo error = 8;
+        FileOperationResult file_result = 9;
+        CommandResult command_result = 10;
     }
 }
 
@@ -95,6 +130,8 @@ enum EventType {
     EVENT_TYPE_METRICS_UPDATE = 8;
     EVENT_TYPE_LOG = 9;
     EVENT_TYPE_HEARTBEAT = 10;
+    EVENT_TYPE_FILE_OPERATION_RESULT = 11;
+    EVENT_TYPE_COMMAND_RESULT = 12;
 }
 
 message ControllerCommand {
@@ -108,6 +145,18 @@ message ControllerCommand {
         DeleteServerCommand delete_server = 7;
         StartServerCommand start_server = 8;
         StopServerCommand stop_server = 9;
+        FileListCommand file_list = 10;
+        FileCreateCommand file_create = 11;
+        FileDeleteCommand file_delete = 12;
+        FileRenameCommand file_rename = 13;
+        FileMoveCommand file_move = 14;
+        FileCopyCommand file_copy = 15;
+        FileWriteCommand file_write = 16;
+        FileReadCommand file_read = 17;
+        FileZipCommand file_zip = 18;
+        FileUnzipCommand file_unzip = 19;
+        FileExistsCommand file_exists = 20;
+        FileMkdirCommand file_mkdir = 21;
     }
 }
 
@@ -120,6 +169,18 @@ enum CommandType {
     COMMAND_TYPE_STOP_SERVER = 5;
     COMMAND_TYPE_RESTART_SERVER = 6;
     COMMAND_TYPE_EXECUTE_COMMAND = 7;
+    COMMAND_TYPE_FILE_LIST = 10;
+    COMMAND_TYPE_FILE_CREATE = 11;
+    COMMAND_TYPE_FILE_DELETE = 12;
+    COMMAND_TYPE_FILE_RENAME = 13;
+    COMMAND_TYPE_FILE_MOVE = 14;
+    COMMAND_TYPE_FILE_COPY = 15;
+    COMMAND_TYPE_FILE_WRITE = 16;
+    COMMAND_TYPE_FILE_READ = 17;
+    COMMAND_TYPE_FILE_ZIP = 18;
+    COMMAND_TYPE_FILE_UNZIP = 19;
+    COMMAND_TYPE_FILE_EXISTS = 20;
+    COMMAND_TYPE_FILE_MKDIR = 21;
 }
 
 message CreateServerCommand {
@@ -149,6 +210,175 @@ message StopServerCommand {
     string server_id = 1;
     int32 grace_period_seconds = 2;
     string reason = 3;
+}
+
+// File Commands for bidirectional streaming
+
+message FileListCommand {
+    string path = 1;
+    bool recursive = 2;
+}
+
+message FileCreateCommand {
+    string path = 1;
+    bool is_directory = 2;
+}
+
+message FileDeleteCommand {
+    string path = 1;
+    bool recursive = 2;
+}
+
+message FileRenameCommand {
+    string old_path = 1;
+    string new_path = 2;
+}
+
+message FileMoveCommand {
+    string source_path = 1;
+    string dest_path = 2;
+}
+
+message FileCopyCommand {
+    string source_path = 1;
+    string dest_path = 2;
+    bool recursive = 3;
+}
+
+message FileWriteCommand {
+    string path = 1;
+    bytes content = 2;
+    bool append = 3;
+}
+
+message FileReadCommand {
+    string path = 1;
+    int64 offset = 2;
+    int64 length = 3;
+}
+
+message FileZipCommand {
+    string source_path = 1;
+    string dest_path = 2;
+    bool recursive = 3;
+}
+
+message FileUnzipCommand {
+    string source_path = 1;
+    string dest_path = 2;
+}
+
+message FileExistsCommand {
+    string path = 1;
+}
+
+message FileMkdirCommand {
+    string path = 1;
+    bool parents = 2;
+}
+
+// File Service Request/Response Messages
+
+message FileListRequest {
+    string node_id = 1;
+    string path = 2;
+    bool recursive = 3;
+}
+
+message FileListResponse {
+    bool success = 1;
+    string error = 2;
+    repeated FileInfo files = 3;
+    string current_path = 4;
+}
+
+message FileCreateRequest {
+    string node_id = 1;
+    string path = 2;
+    bool is_directory = 3;
+}
+
+message FileDeleteRequest {
+    string node_id = 1;
+    string path = 2;
+    bool recursive = 3;
+}
+
+message FileRenameRequest {
+    string node_id = 1;
+    string old_path = 2;
+    string new_path = 3;
+}
+
+message FileMoveRequest {
+    string node_id = 1;
+    string source_path = 2;
+    string dest_path = 3;
+}
+
+message FileCopyRequest {
+    string node_id = 1;
+    string source_path = 2;
+    string dest_path = 3;
+    bool recursive = 4;
+}
+
+message FileReadRequest {
+    string node_id = 1;
+    string path = 2;
+    int64 offset = 3;
+    int64 length = 4;
+}
+
+message FileReadResponse {
+    bool success = 1;
+    string error = 2;
+    bytes content = 3;
+    int64 total_size = 4;
+}
+
+message FileWriteRequest {
+    string node_id = 1;
+    string path = 2;
+    bytes content = 3;
+    bool append = 4;
+}
+
+message FileExistsRequest {
+    string node_id = 1;
+    string path = 2;
+}
+
+message FileExistsResponse {
+    bool success = 1;
+    string error = 2;
+    bool exists = 3;
+    bool is_directory = 4;
+}
+
+message FileMkdirRequest {
+    string node_id = 1;
+    string path = 2;
+    bool parents = 3;
+}
+
+message FileZipRequest {
+    string node_id = 1;
+    string source_path = 2;
+    string dest_path = 3;
+    bool recursive = 4;
+}
+
+message FileUnzipRequest {
+    string node_id = 1;
+    string source_path = 2;
+    string dest_path = 3;
+}
+
+message FileOperationResponse {
+    bool success = 1;
+    string error = 2;
+    string message = 3;
 }
 
 message ServerConfig {

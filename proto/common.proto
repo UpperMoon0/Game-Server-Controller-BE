@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package controller;
+
+option go_package = "github.com/game-server/controller/proto";
+
+// Common message definitions used across services
+
+// FileInfo represents information about a file or directory
+message FileInfo {
+    string name = 1;
+    string path = 2;
+    bool is_directory = 3;
+    int64 size = 4;
+    int64 modified_time = 5;
+    int64 created_time = 6;
+    string permissions = 7;
+}
+
+// FileOperationResult represents the result of a file operation
+message FileOperationResult {
+    string command_id = 1;
+    bool success = 2;
+    string error = 3;
+    oneof result {
+        FileListResult list_result = 4;
+        FileReadResult read_result = 5;
+        FileExistsResult exists_result = 6;
+    }
+}
+
+// FileListResult contains the result of a file list operation
+message FileListResult {
+    repeated FileInfo files = 1;
+    string current_path = 2;
+}
+
+// FileReadResult contains the result of a file read operation
+message FileReadResult {
+    bytes content = 1;
+    int64 total_size = 2;
+}
+
+// FileExistsResult contains the result of a file exists check
+message FileExistsResult {
+    bool exists = 1;
+    bool is_directory = 2;
+}
+
+// CommandResult represents the result of a command execution
+message CommandResult {
+    string command_id = 1;
+    bool success = 2;
+    string message = 3;
+}
