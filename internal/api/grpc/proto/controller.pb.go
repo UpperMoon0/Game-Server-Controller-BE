@@ -245,6 +245,8 @@ type RegisterNodeRequest struct {
 	SupportedGames []string       `json:"supportedGames"`
 	OsVersion      string         `json:"osVersion"`
 	AgentVersion   string         `json:"agentVersion"`
+	Initialized    bool           `json:"initialized"`
+	GameType       string         `json:"gameType"`
 }
 
 // RegisterNodeResponse represents the response from node registration

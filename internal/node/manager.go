@@ -537,3 +537,21 @@ func (m *Manager) checkNodeHealth() {
 		}
 	}
 }
+
+// GetPendingCommand returns the next pending command for a node
+func (m *Manager) GetPendingCommand(nodeID string) (*Command, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	state, exists := m.nodes[nodeID]
+	if !exists {
+		return nil, fmt.Errorf("node not found: %s", nodeID)
+	}
+
+	select {
+	case cmd := <-state.CommandQueue:
+		return cmd, nil
+	default:
+		return nil, nil
+	}
+}

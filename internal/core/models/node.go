@@ -28,6 +28,15 @@ type Node struct {
 	GameType  string `json:"game_type" db:"game_type"`
 	Version   string `json:"version" db:"version"`
 	Port      int    `json:"port" db:"port"`
+	IPAddress string `json:"ip_address" db:"-"`
+	
+	// Resource info
+	TotalCPUCores      int32 `json:"total_cpu_cores" db:"-"`
+	TotalMemoryMB      int64 `json:"total_memory_mb" db:"-"`
+	TotalStorageMB     int64 `json:"total_storage_mb" db:"-"`
+	AvailableCPUCores  int32 `json:"available_cpu_cores" db:"-"`
+	AvailableMemoryMB  int64 `json:"available_memory_mb" db:"-"`
+	AvailableStorageMB int64 `json:"available_storage_mb" db:"-"`
 	
 	// Initialization state (stored in DB, managed by node agent)
 	Initialized bool `json:"initialized" db:"initialized"`
@@ -114,4 +123,6 @@ const (
 	EventTypeNodeError        EventType = "node_error"
 	EventTypeMetricsUpdate    EventType = "metrics_update"
 	EventTypeHeartbeat        EventType = "heartbeat"
+	EventTypeServerStarted    EventType = "server_started"
+	EventTypeServerStopped    EventType = "server_stopped"
 )
