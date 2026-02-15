@@ -311,6 +311,173 @@ func (cm *ContainerManager) findContainerByNodeID(ctx context.Context, nodeID st
 	return containers[0].ID, nil
 }
 
+// UpdateNodeContainer updates a node container to a new image while preserving data
+func (cm *ContainerManager) UpdateNodeContainer(ctx context.Context, nodeID string, newImage string) (string, error) {
+	// Find the existing container
+	containerID, err := cm.findContainerByNodeID(ctx, nodeID)
+	if err != nil {
+		return "", err
+	}
+	if containerID == "" {
+		return "", fmt.Errorf("container not found for node: %s", nodeID)
+	}
+
+	// Inspect the existing container to get its configuration
+	info, err := cm.client.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect container: %w", err)
+	}
+
+	cm.logger.Info("Updating node container to new image",
+		zap.String("node_id", nodeID),
+		zap.String("old_image", info.Config.Image),
+		zap.String("new_image", newImage),
+		zap.String("container_id", containerID))
+
+	// Pull the new image
+	cm.logger.Info("Pulling new image", zap.String("image", newImage))
+	reader, err := cm.client.ImagePull(ctx, newImage, image.PullOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to pull image %s: %w", newImage, err)
+	}
+	_, err = io.Copy(io.Discard, reader)
+	if err != nil {
+		reader.Close()
+		return "", fmt.Errorf("failed to complete image pull: %w", err)
+	}
+	reader.Close()
+	cm.logger.Info("Successfully pulled new image", zap.String("image", newImage))
+
+	// Stop the container
+	timeout := 30
+	if err := cm.client.ContainerStop(ctx, containerID, container.StopOptions{Timeout: &timeout}); err != nil {
+		return "", fmt.Errorf("failed to stop container: %w", err)
+	}
+	cm.logger.Info("Stopped container for update", zap.String("container_id", containerID))
+
+	// Get the volume binds from the old container
+	var binds []string
+	for _, mount := range info.Mounts {
+		if mount.Type == "volume" {
+			binds = append(binds, fmt.Sprintf("%s:%s", mount.Name, mount.Destination))
+		}
+	}
+
+	// Get environment variables from old container
+	envVars := info.Config.Env
+
+	// Get labels from old container
+	labels := info.Config.Labels
+
+	// Get network settings
+	var networkName string
+	for name := range info.NetworkSettings.Networks {
+		networkName = name
+		break
+	}
+
+	// Get port bindings
+	var hostPort string
+	if ports, ok := info.NetworkSettings.Ports["50051/tcp"]; ok && len(ports) > 0 {
+		hostPort = ports[0].HostPort
+	}
+
+	// Remove the old container
+	if err := cm.client.ContainerRemove(ctx, containerID, container.RemoveOptions{
+		Force: true,
+	}); err != nil {
+		return "", fmt.Errorf("failed to remove old container: %w", err)
+	}
+	cm.logger.Info("Removed old container", zap.String("container_id", containerID))
+
+	// Create new container with the same configuration but new image
+	containerName := info.Name
+	if containerName[0] == '/' {
+		containerName = containerName[1:]
+	}
+
+	// Container configuration
+	containerConfig := &container.Config{
+		Image:       newImage,
+		Env:         envVars,
+		Labels:      labels,
+		ExposedPorts: nat.PortSet{
+			"50051/tcp": struct{}{},
+		},
+	}
+
+	// Host configuration
+	hostConfig := &container.HostConfig{
+		Binds: binds,
+		PortBindings: nat.PortMap{
+			"50051/tcp": []nat.PortBinding{
+				{HostIP: "0.0.0.0", HostPort: hostPort},
+			},
+		},
+		RestartPolicy: container.RestartPolicy{
+			Name: "unless-stopped",
+		},
+		Resources: info.HostConfig.Resources,
+	}
+
+	// Network configuration
+	networkConfig := &network.NetworkingConfig{}
+	if networkName != "" {
+		networkConfig.EndpointsConfig = map[string]*network.EndpointSettings{
+			networkName: {},
+		}
+	}
+
+	// Create new container
+	resp, err := cm.client.ContainerCreate(ctx,
+		containerConfig,
+		hostConfig,
+		networkConfig,
+		nil,
+		containerName,
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to create new container: %w", err)
+	}
+
+	// Start the new container
+	if err := cm.client.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		// Clean up container on start failure
+		_ = cm.client.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
+		return "", fmt.Errorf("failed to start new container: %w", err)
+	}
+
+	cm.logger.Info("Node container updated successfully",
+		zap.String("node_id", nodeID),
+		zap.String("old_container_id", containerID),
+		zap.String("new_container_id", resp.ID),
+		zap.String("new_image", newImage))
+
+	return resp.ID, nil
+}
+
+// RestartNodeContainer restarts a node container
+func (cm *ContainerManager) RestartNodeContainer(ctx context.Context, nodeID string) error {
+	containerID, err := cm.findContainerByNodeID(ctx, nodeID)
+	if err != nil {
+		return err
+	}
+	if containerID == "" {
+		return fmt.Errorf("container not found for node: %s", nodeID)
+	}
+
+	timeout := 30
+	if err := cm.client.ContainerRestart(ctx, containerID, container.StopOptions{Timeout: &timeout}); err != nil {
+		return fmt.Errorf("failed to restart container: %w", err)
+	}
+
+	cm.logger.Info("Node container restarted",
+		zap.String("node_id", nodeID),
+		zap.String("container_id", containerID))
+
+	return nil
+}
+
 // Close closes the Docker client
 func (cm *ContainerManager) Close() error {
 	return cm.client.Close()

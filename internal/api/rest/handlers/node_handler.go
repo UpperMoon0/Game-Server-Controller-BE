@@ -304,6 +304,7 @@ func (h *NodeHandler) NodeAction(c *gin.Context) {
 	var req struct {
 		Action   string `json:"action" binding:"required"`
 		GameType string `json:"game_type,omitempty"`
+		Image    string `json:"image,omitempty"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -395,6 +396,61 @@ func (h *NodeHandler) NodeAction(c *gin.Context) {
 		// Refresh node connection
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Node refresh requested",
+		})
+
+	case "restart":
+		// Restart the node container
+		if h.containerMgr == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "Container manager not available",
+				"message": "Docker is not configured or unavailable",
+			})
+			return
+		}
+
+		if err := h.containerMgr.RestartNodeContainer(c.Request.Context(), id); err != nil {
+			h.logger.Error("Failed to restart node container", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "Failed to restart node container",
+				"message": err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Node container restarted successfully",
+		})
+
+	case "update-image":
+		// Update the node container to a new image
+		if h.containerMgr == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "Container manager not available",
+				"message": "Docker is not configured or unavailable",
+			})
+			return
+		}
+
+		// Get the image from request or use default from config
+		newImage := req.Image
+		if newImage == "" {
+			newImage = h.cfg.NodeAgentImage
+		}
+
+		newContainerID, err := h.containerMgr.UpdateNodeContainer(c.Request.Context(), id, newImage)
+		if err != nil {
+			h.logger.Error("Failed to update node container image", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "Failed to update node container",
+				"message": err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message":       "Node container updated successfully",
+			"new_image":     newImage,
+			"new_container_id": newContainerID,
 		})
 
 	default:
