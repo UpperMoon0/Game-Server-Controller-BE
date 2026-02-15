@@ -55,6 +55,11 @@ const (
 	CommandTypeRestart   CommandType = "restart"
 )
 
+// String returns the string representation of CommandType
+func (c CommandType) String() string {
+	return string(c)
+}
+
 // CommandResult represents the result of a command
 type CommandResult struct {
 	Success bool
@@ -393,12 +398,23 @@ func (m *Manager) InitializeNode(nodeID string, gameType string) (*CommandResult
 		return nil, err
 	}
 
-	// Wait for response with timeout
-	select {
-	case result := <-cmd.Response:
-		return result, nil
-	case <-time.After(5 * time.Minute):
-		return nil, fmt.Errorf("initialize command timed out")
+	// Wait for response with timeout - poll for the result
+	timeout := time.After(5 * time.Minute)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			return nil, fmt.Errorf("initialize command timed out")
+		case <-ticker.C:
+			// Check if we have a result
+			result := getCommandResult(cmd.ID)
+			if result != nil {
+				deleteCommandResult(cmd.ID)
+				return result, nil
+			}
+		}
 	}
 }
 
@@ -554,4 +570,62 @@ func (m *Manager) GetPendingCommand(nodeID string) (*Command, error) {
 	default:
 		return nil, nil
 	}
+}
+
+// HandleCommandResult handles the result of a command from a node
+func (m *Manager) HandleCommandResult(nodeID string, commandID string, success bool, message string) {
+	m.mu.RLock()
+	state, exists := m.nodes[nodeID]
+	m.mu.RUnlock()
+
+	if !exists {
+		m.logger.Warn("Received command result for unknown node",
+			zap.String("node_id", nodeID),
+			zap.String("command_id", commandID))
+		return
+	}
+
+	// Try to find the command in the queue and send the response
+	select {
+	case state.CommandQueue <- &Command{
+		ID:       commandID,
+		Response: nil, // We'll create a response channel if needed
+	}:
+	default:
+	}
+
+	m.logger.Info("Command result processed",
+		zap.String("node_id", nodeID),
+		zap.String("command_id", commandID),
+		zap.Bool("success", success),
+		zap.String("message", message))
+
+	// Store the result for the waiting InitializeNode call
+	// This is a simplified approach - in production you'd want a proper pending command tracking
+	m.storeCommandResult(commandID, success, message)
+}
+
+// pendingResults stores command results temporarily
+var pendingResults = make(map[string]*CommandResult)
+var pendingResultsMu sync.RWMutex
+
+func (m *Manager) storeCommandResult(commandID string, success bool, message string) {
+	pendingResultsMu.Lock()
+	defer pendingResultsMu.Unlock()
+	pendingResults[commandID] = &CommandResult{
+		Success: success,
+		Message: message,
+	}
+}
+
+func getCommandResult(commandID string) *CommandResult {
+	pendingResultsMu.RLock()
+	defer pendingResultsMu.RUnlock()
+	return pendingResults[commandID]
+}
+
+func deleteCommandResult(commandID string) {
+	pendingResultsMu.Lock()
+	defer pendingResultsMu.Unlock()
+	delete(pendingResults, commandID)
 }

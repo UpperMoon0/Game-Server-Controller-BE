@@ -34,6 +34,8 @@ const (
 	EventType_EVENT_TYPE_HEARTBEAT             EventType = 10
 	EventType_EVENT_TYPE_FILE_OPERATION_RESULT EventType = 11
 	EventType_EVENT_TYPE_COMMAND_RESULT        EventType = 12
+	EventType_EVENT_TYPE_NODE_INITIALIZING     EventType = 13
+	EventType_EVENT_TYPE_NODE_READY            EventType = 14
 )
 
 func (e EventType) String() string {
@@ -62,6 +64,10 @@ func (e EventType) String() string {
 		return "FILE_OPERATION_RESULT"
 	case EventType_EVENT_TYPE_COMMAND_RESULT:
 		return "COMMAND_RESULT"
+	case EventType_EVENT_TYPE_NODE_INITIALIZING:
+		return "NODE_INITIALIZING"
+	case EventType_EVENT_TYPE_NODE_READY:
+		return "NODE_READY"
 	default:
 		return "UNSPECIFIED"
 	}
@@ -72,13 +78,14 @@ type CommandType int32
 
 const (
 	CommandType_COMMAND_TYPE_UNSPECIFIED     CommandType = 0
-	CommandType_COMMAND_TYPE_CREATE_SERVER   CommandType = 1
-	CommandType_COMMAND_TYPE_UPDATE_SERVER   CommandType = 2
-	CommandType_COMMAND_TYPE_DELETE_SERVER   CommandType = 3
-	CommandType_COMMAND_TYPE_START_SERVER    CommandType = 4
-	CommandType_COMMAND_TYPE_STOP_SERVER     CommandType = 5
-	CommandType_COMMAND_TYPE_RESTART_SERVER  CommandType = 6
-	CommandType_COMMAND_TYPE_EXECUTE_COMMAND CommandType = 7
+	CommandType_COMMAND_TYPE_INITIALIZE_NODE CommandType = 1
+	CommandType_COMMAND_TYPE_CREATE_SERVER   CommandType = 2
+	CommandType_COMMAND_TYPE_UPDATE_SERVER   CommandType = 3
+	CommandType_COMMAND_TYPE_DELETE_SERVER   CommandType = 4
+	CommandType_COMMAND_TYPE_START_SERVER    CommandType = 5
+	CommandType_COMMAND_TYPE_STOP_SERVER     CommandType = 6
+	CommandType_COMMAND_TYPE_RESTART_SERVER  CommandType = 7
+	CommandType_COMMAND_TYPE_EXECUTE_COMMAND CommandType = 8
 	CommandType_COMMAND_TYPE_FILE_LIST       CommandType = 10
 	CommandType_COMMAND_TYPE_FILE_CREATE     CommandType = 11
 	CommandType_COMMAND_TYPE_FILE_DELETE     CommandType = 12
@@ -95,6 +102,8 @@ const (
 
 func (c CommandType) String() string {
 	switch c {
+	case CommandType_COMMAND_TYPE_INITIALIZE_NODE:
+		return "INITIALIZE_NODE"
 	case CommandType_COMMAND_TYPE_CREATE_SERVER:
 		return "CREATE_SERVER"
 	case CommandType_COMMAND_TYPE_UPDATE_SERVER:
@@ -286,27 +295,35 @@ type NodeEvent struct {
 
 // ControllerCommand represents a command from the controller
 type ControllerCommand struct {
-	CommandId    string              `json:"commandId"`
-	ServerId     string              `json:"serverId"`
-	Type         CommandType         `json:"type"`
-	Timestamp    int64               `json:"timestamp"`
-	CreateServer *CreateServerCmd    `json:"createServer,omitempty"`
-	UpdateServer *UpdateServerCmd    `json:"updateServer,omitempty"`
-	DeleteServer *DeleteServerCmd    `json:"deleteServer,omitempty"`
-	StartServer  *StartServerCmd     `json:"startServer,omitempty"`
-	StopServer   *StopServerCmd      `json:"stopServer,omitempty"`
-	FileList     *FileListCmd        `json:"fileList,omitempty"`
-	FileCreate   *FileCreateCmd      `json:"fileCreate,omitempty"`
-	FileDelete   *FileDeleteCmd      `json:"fileDelete,omitempty"`
-	FileRename   *FileRenameCmd      `json:"fileRename,omitempty"`
-	FileMove     *FileMoveCmd        `json:"fileMove,omitempty"`
-	FileCopy     *FileCopyCmd        `json:"fileCopy,omitempty"`
-	FileWrite    *FileWriteCmd       `json:"fileWrite,omitempty"`
-	FileRead     *FileReadCmd        `json:"fileRead,omitempty"`
-	FileZip      *FileZipCmd         `json:"fileZip,omitempty"`
-	FileUnzip    *FileUnzipCmd       `json:"fileUnzip,omitempty"`
-	FileExists   *FileExistsCmd      `json:"fileExists,omitempty"`
-	FileMkdir    *FileMkdirCmd       `json:"fileMkdir,omitempty"`
+	CommandId      string            `json:"commandId"`
+	ServerId       string            `json:"serverId"`
+	Type           CommandType       `json:"type"`
+	Timestamp      int64             `json:"timestamp"`
+	InitializeNode *InitializeNodeCmd `json:"initializeNode,omitempty"`
+	CreateServer   *CreateServerCmd  `json:"createServer,omitempty"`
+	UpdateServer   *UpdateServerCmd  `json:"updateServer,omitempty"`
+	DeleteServer   *DeleteServerCmd  `json:"deleteServer,omitempty"`
+	StartServer    *StartServerCmd   `json:"startServer,omitempty"`
+	StopServer     *StopServerCmd    `json:"stopServer,omitempty"`
+	FileList       *FileListCmd      `json:"fileList,omitempty"`
+	FileCreate     *FileCreateCmd    `json:"fileCreate,omitempty"`
+	FileDelete     *FileDeleteCmd    `json:"fileDelete,omitempty"`
+	FileRename     *FileRenameCmd    `json:"fileRename,omitempty"`
+	FileMove       *FileMoveCmd      `json:"fileMove,omitempty"`
+	FileCopy       *FileCopyCmd      `json:"fileCopy,omitempty"`
+	FileWrite      *FileWriteCmd     `json:"fileWrite,omitempty"`
+	FileRead       *FileReadCmd      `json:"fileRead,omitempty"`
+	FileZip        *FileZipCmd       `json:"fileZip,omitempty"`
+	FileUnzip      *FileUnzipCmd     `json:"fileUnzip,omitempty"`
+	FileExists     *FileExistsCmd    `json:"fileExists,omitempty"`
+	FileMkdir      *FileMkdirCmd     `json:"fileMkdir,omitempty"`
+}
+
+// Node Commands
+
+// InitializeNodeCmd contains parameters for initializing a node
+type InitializeNodeCmd struct {
+	GameType string `json:"gameType"`
 }
 
 // Server Commands

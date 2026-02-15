@@ -92,6 +92,19 @@ func (s *nodeServiceServer) StreamEvents(stream proto.NodeService_StreamEventsSe
 			zap.String("type", event.Type.String()),
 		)
 
+		// Handle command results
+		if event.Type == proto.EventType_EVENT_TYPE_COMMAND_RESULT && event.CommandResult != nil {
+			s.logger.Info("Received command result",
+				zap.String("nodeId", nodeID),
+				zap.String("commandId", event.CommandResult.CommandId),
+				zap.Bool("success", event.CommandResult.Success),
+				zap.String("message", event.CommandResult.Message))
+
+			// Handle the command result through the manager
+			s.manager.HandleCommandResult(nodeID, event.CommandResult.CommandId, event.CommandResult.Success, event.CommandResult.Message)
+			continue
+		}
+
 		// Convert proto event to internal event
 		internalEvent := &node.StreamEvent{
 			NodeID:    event.NodeId,
@@ -111,6 +124,11 @@ func (s *nodeServiceServer) StreamEvents(stream proto.NodeService_StreamEventsSe
 		// Convert command to proto
 		protoCmd := convertCommandToProto(cmd)
 		if protoCmd != nil {
+			s.logger.Info("Sending command to node",
+				zap.String("nodeId", nodeID),
+				zap.String("commandId", cmd.ID),
+				zap.String("type", cmd.Type.String()))
+			
 			if err := stream.Send(protoCmd); err != nil {
 				s.logger.Error("Failed to send command to node",
 					zap.String("nodeId", nodeID),
@@ -200,6 +218,12 @@ func convertCommandToProto(cmd *node.Command) *proto.ControllerCommand {
 	}
 
 	switch cmd.Type {
+	case node.CommandTypeInitialize:
+		if gameType, ok := cmd.Payload.(string); ok {
+			protoCmd.InitializeNode = &proto.InitializeNodeCmd{
+				GameType: gameType,
+			}
+		}
 	case node.CommandTypeStart:
 		if serverID, ok := cmd.Payload.(string); ok {
 			protoCmd.StartServer = &proto.StartServerCmd{
@@ -219,6 +243,8 @@ func convertCommandToProto(cmd *node.Command) *proto.ControllerCommand {
 
 func convertCommandType(t node.CommandType) proto.CommandType {
 	switch t {
+	case node.CommandTypeInitialize:
+		return proto.CommandType_COMMAND_TYPE_INITIALIZE_NODE
 	case node.CommandTypeStart:
 		return proto.CommandType_COMMAND_TYPE_START_SERVER
 	case node.CommandTypeStop:

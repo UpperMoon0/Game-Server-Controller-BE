@@ -132,6 +132,8 @@ enum EventType {
     EVENT_TYPE_HEARTBEAT = 10;
     EVENT_TYPE_FILE_OPERATION_RESULT = 11;
     EVENT_TYPE_COMMAND_RESULT = 12;
+    EVENT_TYPE_NODE_INITIALIZING = 13;
+    EVENT_TYPE_NODE_READY = 14;
 }
 
 message ControllerCommand {
@@ -140,6 +142,7 @@ message ControllerCommand {
     CommandType type = 3;
     int64 timestamp = 4;
     oneof payload {
+        InitializeNodeCommand initialize_node = 22;
         CreateServerCommand create_server = 5;
         UpdateServerCommand update_server = 6;
         DeleteServerCommand delete_server = 7;
@@ -160,15 +163,20 @@ message ControllerCommand {
     }
 }
 
+message InitializeNodeCommand {
+    string game_type = 1;
+}
+
 enum CommandType {
     COMMAND_TYPE_UNSPECIFIED = 0;
-    COMMAND_TYPE_CREATE_SERVER = 1;
-    COMMAND_TYPE_UPDATE_SERVER = 2;
-    COMMAND_TYPE_DELETE_SERVER = 3;
-    COMMAND_TYPE_START_SERVER = 4;
-    COMMAND_TYPE_STOP_SERVER = 5;
-    COMMAND_TYPE_RESTART_SERVER = 6;
-    COMMAND_TYPE_EXECUTE_COMMAND = 7;
+    COMMAND_TYPE_INITIALIZE_NODE = 1;
+    COMMAND_TYPE_CREATE_SERVER = 2;
+    COMMAND_TYPE_UPDATE_SERVER = 3;
+    COMMAND_TYPE_DELETE_SERVER = 4;
+    COMMAND_TYPE_START_SERVER = 5;
+    COMMAND_TYPE_STOP_SERVER = 6;
+    COMMAND_TYPE_RESTART_SERVER = 7;
+    COMMAND_TYPE_EXECUTE_COMMAND = 8;
     COMMAND_TYPE_FILE_LIST = 10;
     COMMAND_TYPE_FILE_CREATE = 11;
     COMMAND_TYPE_FILE_DELETE = 12;
