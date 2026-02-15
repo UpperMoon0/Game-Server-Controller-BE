@@ -13,7 +13,6 @@ import (
 	"github.com/game-server/controller/internal/core/repository"
 	"github.com/game-server/controller/internal/docker"
 	"github.com/game-server/controller/internal/node"
-	"github.com/game-server/controller/internal/scheduler"
 	"github.com/game-server/controller/pkg/config"
 	"go.uber.org/zap"
 )
@@ -86,17 +85,14 @@ func main() {
 	// Initialize node manager
 	nodeMgr := node.NewManager(nodeRepo, volumeMgr, containerMgr, cfg, log)
 
-	// Initialize scheduler
-	sched := scheduler.NewScheduler(nodeRepo, nodeMgr, log)
-
 	// Initialize gRPC server
-	grpcServer, err := server.NewGRPCServer(cfg, nodeMgr, sched, log)
+	grpcServer, err := server.NewGRPCServer(cfg, nodeMgr, log)
 	if err != nil {
 		log.Fatal("Failed to create gRPC server", zap.Error(err))
 	}
 
 	// Initialize REST API server
-	restServer := rest.NewServer(cfg, nodeMgr, sched, containerMgr, log)
+	restServer := rest.NewServer(cfg, nodeMgr, containerMgr, log)
 
 	// Start gRPC server
 	go func() {

@@ -1,4 +1,4 @@
-7package models
+package models
 
 import (
 	"database/sql"
@@ -21,23 +21,26 @@ const (
 )
 
 // Node represents a game server node instance
+// Note: Status is fetched from node agents via gRPC, not stored in DB
 type Node struct {
-	ID        string     `json:"id" db:"id"`
-	Name      string     `json:"name" db:"name"`
-	Status    NodeStatus `json:"status" db:"status"`
-	GameType  string     `json:"game_type" db:"game_type"`
-	Version   string     `json:"version" db:"version"`
-	Port      int        `json:"port" db:"port"`
+	ID        string `json:"id" db:"id"`
+	Name      string `json:"name" db:"name"`
+	GameType  string `json:"game_type" db:"game_type"`
+	Version   string `json:"version" db:"version"`
+	Port      int    `json:"port" db:"port"`
 	
 	// Agent Connection
 	AgentVersion      string `json:"agent_version" db:"agent_version"`
 	HeartbeatInterval int    `json:"heartbeat_interval" db:"heartbeat_interval"`
-	LastHeartbeat     time.Time `json:"last_heartbeat" db:"last_heartbeat"`
 	
 	// Timestamps
 	CreatedAt time.Time     `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time     `json:"updated_at" db:"updated_at"`
 	StartedAt sql.NullTime  `json:"started_at" db:"started_at"`
+	
+	// Runtime state (fetched from node agent, not stored in DB)
+	Status        NodeStatus `json:"status" db:"-"`
+	LastHeartbeat time.Time   `json:"last_heartbeat" db:"-"`
 }
 
 // NodeMetrics represents real-time metrics for a node (fetched from node agent, not stored in DB)

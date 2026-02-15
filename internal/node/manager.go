@@ -49,9 +49,10 @@ type Command struct {
 type CommandType string
 
 const (
-	CommandTypeStart   CommandType = "start"
-	CommandTypeStop    CommandType = "stop"
-	CommandTypeRestart CommandType = "restart"
+	CommandTypeInitialize CommandType = "initialize"
+	CommandTypeStart     CommandType = "start"
+	CommandTypeStop      CommandType = "stop"
+	CommandTypeRestart   CommandType = "restart"
 )
 
 // CommandResult represents the result of a command
@@ -376,6 +377,28 @@ func (m *Manager) SendCommand(nodeID string, cmd *Command) error {
 		return nil
 	default:
 		return fmt.Errorf("command queue full for node: %s", nodeID)
+	}
+}
+
+// InitializeNode sends an initialize command to a node
+func (m *Manager) InitializeNode(nodeID string, gameType string) (*CommandResult, error) {
+	cmd := &Command{
+		ID:       fmt.Sprintf("init-%d", time.Now().UnixNano()),
+		Type:     CommandTypeInitialize,
+		Payload:  gameType,
+		Response: make(chan *CommandResult, 1),
+	}
+
+	if err := m.SendCommand(nodeID, cmd); err != nil {
+		return nil, err
+	}
+
+	// Wait for response with timeout
+	select {
+	case result := <-cmd.Response:
+		return result, nil
+	case <-time.After(5 * time.Minute):
+		return nil, fmt.Errorf("initialize command timed out")
 	}
 }
 

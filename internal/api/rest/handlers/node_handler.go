@@ -7,7 +7,6 @@ import (
 	"github.com/game-server/controller/internal/core/models"
 	"github.com/game-server/controller/internal/docker"
 	"github.com/game-server/controller/internal/node"
-	"github.com/game-server/controller/internal/scheduler"
 	"github.com/game-server/controller/pkg/config"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -15,8 +14,7 @@ import (
 
 // NodeHandler handles REST API requests for nodes
 type NodeHandler struct {
-	nodeRepo     *node.Manager
-	scheduler    *scheduler.Scheduler
+	nodeMgr      *node.Manager
 	containerMgr *docker.ContainerManager
 	cfg          *config.Config
 	logger       *zap.Logger
@@ -24,15 +22,13 @@ type NodeHandler struct {
 
 // NewNodeHandler creates a new node handler
 func NewNodeHandler(
-	nodeRepo *node.Manager,
-	scheduler *scheduler.Scheduler,
+	nodeMgr *node.Manager,
 	containerMgr *docker.ContainerManager,
 	cfg *config.Config,
 	logger *zap.Logger,
 ) *NodeHandler {
 	return &NodeHandler{
-		nodeRepo:     nodeRepo,
-		scheduler:    scheduler,
+		nodeMgr:      nodeMgr,
 		containerMgr: containerMgr,
 		cfg:          cfg,
 		logger:       logger,
@@ -63,7 +59,7 @@ func (h *NodeHandler) ListNodes(c *gin.Context) {
 		nodeStatus = &s
 	}
 
-	nodes, err := h.nodeRepo.ListNodes()
+	nodes, err := h.nodeMgr.ListNodes()
 	if err != nil {
 		h.logger.Error("Failed to list nodes", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -96,7 +92,7 @@ func (h *NodeHandler) ListNodes(c *gin.Context) {
 func (h *NodeHandler) GetNode(c *gin.Context) {
 	id := c.Param("id")
 
-	node, err := h.nodeRepo.GetNode(id)
+	node, err := h.nodeMgr.GetNode(id)
 	if err != nil {
 		h.logger.Error("Failed to get node", zap.Error(err))
 		c.JSON(http.StatusNotFound, gin.H{
@@ -192,7 +188,7 @@ func (h *NodeHandler) UpdateNode(c *gin.Context) {
 		return
 	}
 
-	node, err := h.nodeRepo.GetNode(id)
+	node, err := h.nodeMgr.GetNode(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":   "Node not found",
@@ -218,7 +214,7 @@ func (h *NodeHandler) UpdateNode(c *gin.Context) {
 		node.Status = *req.Status
 	}
 
-	if err := h.nodeRepo.Update(node); err != nil {
+	if err := h.nodeMgr.Update(node); err != nil {
 		h.logger.Error("Failed to update node", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to update node",
@@ -250,7 +246,7 @@ func (h *NodeHandler) DeleteNode(c *gin.Context) {
 	}
 
 	// Delete the node (this will also delete volumes via node manager)
-	if err := h.nodeRepo.DeleteNode(ctx, id); err != nil {
+	if err := h.nodeMgr.DeleteNode(ctx, id); err != nil {
 		h.logger.Error("Failed to delete node", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to delete node",
@@ -266,7 +262,7 @@ func (h *NodeHandler) DeleteNode(c *gin.Context) {
 func (h *NodeHandler) GetNodeStatus(c *gin.Context) {
 	id := c.Param("id")
 
-	metrics, err := h.nodeRepo.GetNodeMetrics(id)
+	metrics, err := h.nodeMgr.GetNodeMetrics(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":   "Node not found",
@@ -286,7 +282,7 @@ func (h *NodeHandler) GetNodeStatus(c *gin.Context) {
 func (h *NodeHandler) GetNodeMetrics(c *gin.Context) {
 	id := c.Param("id")
 
-	metrics, err := h.nodeRepo.GetNodeMetrics(id)
+	metrics, err := h.nodeMgr.GetNodeMetrics(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":   "Node not found",
@@ -306,7 +302,8 @@ func (h *NodeHandler) NodeAction(c *gin.Context) {
 	id := c.Param("id")
 
 	var req struct {
-		Action string `json:"action" binding:"required"`
+		Action   string `json:"action" binding:"required"`
+		GameType string `json:"game_type,omitempty"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -317,26 +314,43 @@ func (h *NodeHandler) NodeAction(c *gin.Context) {
 	}
 
 	switch req.Action {
-	case "maintenance":
-		// Set node to maintenance mode
-		node, err := h.nodeRepo.GetNode(id)
+	case "initialize":
+		// Initialize the node (install dependencies based on game type)
+		gameType := req.GameType
+		if gameType == "" {
+			// Get game type from node if not provided
+			node, err := h.nodeMgr.GetNode(id)
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error":   "Node not found",
+					"message": err.Error(),
+				})
+				return
+			}
+			gameType = node.GameType
+		}
+
+		// Send initialize command to node agent
+		result, err := h.nodeMgr.InitializeNode(id, gameType)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error":   "Node not found",
-				"message": err.Error(),
-			})
-			return
-		}
-		node.Status = models.NodeStatusMaintenance
-		if err := h.nodeRepo.Update(node); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "Failed to set maintenance mode",
+				"error":   "Failed to initialize node",
 				"message": err.Error(),
 			})
 			return
 		}
+
+		if !result.Success {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "Initialize command failed",
+				"message": result.Message,
+			})
+			return
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"message": "Node set to maintenance mode",
+			"message":  "Node initialized successfully",
+			"game_type": gameType,
 		})
 
 	case "refresh":

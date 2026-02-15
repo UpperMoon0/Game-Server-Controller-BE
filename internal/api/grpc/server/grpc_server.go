@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/game-server/controller/internal/node"
-	"github.com/game-server/controller/internal/scheduler"
 	"github.com/game-server/controller/pkg/config"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -20,7 +19,6 @@ type GRPCServer struct {
 	grpcServer *grpc.Server
 	cfg        *config.Config
 	nodeMgr    *node.Manager
-	scheduler  *scheduler.Scheduler
 	logger     *zap.Logger
 }
 
@@ -28,7 +26,6 @@ type GRPCServer struct {
 func NewGRPCServer(
 	cfg *config.Config,
 	nodeMgr *node.Manager,
-	scheduler *scheduler.Scheduler,
 	logger *zap.Logger,
 ) (*GRPCServer, error) {
 	var opts []grpc.ServerOption
@@ -59,7 +56,6 @@ func NewGRPCServer(
 		grpcServer: grpc.NewServer(opts...),
 		cfg:        cfg,
 		nodeMgr:    nodeMgr,
-		scheduler:  scheduler,
 		logger:     logger,
 	}, nil
 }

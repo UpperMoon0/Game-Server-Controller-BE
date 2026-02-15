@@ -12,6 +12,7 @@ import (
 )
 
 // NodeRepository handles database operations for nodes
+// Note: Status and LastHeartbeat are fetched from node agents via gRPC, not stored in DB
 type NodeRepository struct {
 	db     *Database
 	logger *zap.Logger
@@ -33,13 +34,13 @@ func (r *NodeRepository) Create(ctx context.Context, node *models.Node) error {
 
 	query := `
 		INSERT INTO nodes (
-			id, name, port, status, game_type, version,
+			id, name, port, game_type, version,
 			agent_version, heartbeat_interval, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
-		node.ID, node.Name, node.Port, node.Status, node.GameType, node.Version,
+		node.ID, node.Name, node.Port, node.GameType, node.Version,
 		node.AgentVersion, node.HeartbeatInterval,
 		node.CreatedAt, node.UpdatedAt,
 	)
@@ -58,21 +59,20 @@ func (r *NodeRepository) Create(ctx context.Context, node *models.Node) error {
 // GetByID retrieves a node by ID
 func (r *NodeRepository) GetByID(ctx context.Context, id string) (*models.Node, error) {
 	query := `
-		SELECT id, name, port, status, game_type, version,
-			agent_version, heartbeat_interval, last_heartbeat,
+		SELECT id, name, port, game_type, version,
+			agent_version, heartbeat_interval,
 			created_at, updated_at, started_at
 		FROM nodes WHERE id = $1
 	`
 
 	var node models.Node
-	var lastHeartbeat sql.NullTime
 	var agentVersion sql.NullString
 	var version sql.NullString
 	var startedAt sql.NullTime
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&node.ID, &node.Name, &node.Port, &node.Status, &node.GameType, &version,
-		&agentVersion, &node.HeartbeatInterval, &lastHeartbeat,
+		&node.ID, &node.Name, &node.Port, &node.GameType, &version,
+		&agentVersion, &node.HeartbeatInterval,
 		&node.CreatedAt, &node.UpdatedAt, &startedAt,
 	)
 
@@ -89,12 +89,12 @@ func (r *NodeRepository) GetByID(ctx context.Context, id string) (*models.Node, 
 	if version.Valid {
 		node.Version = version.String
 	}
-	if lastHeartbeat.Valid {
-		node.LastHeartbeat = lastHeartbeat.Time
-	}
 	if startedAt.Valid {
 		node.StartedAt = startedAt
 	}
+
+	// Status is fetched from node agent via gRPC, default to stopped
+	node.Status = models.NodeStatusStopped
 
 	return &node, nil
 }
@@ -102,21 +102,20 @@ func (r *NodeRepository) GetByID(ctx context.Context, id string) (*models.Node, 
 // GetByName retrieves a node by name
 func (r *NodeRepository) GetByName(ctx context.Context, name string) (*models.Node, error) {
 	query := `
-		SELECT id, name, port, status, game_type, version,
-			agent_version, heartbeat_interval, last_heartbeat,
+		SELECT id, name, port, game_type, version,
+			agent_version, heartbeat_interval,
 			created_at, updated_at, started_at
 		FROM nodes WHERE name = $1
 	`
 
 	var node models.Node
-	var lastHeartbeat sql.NullTime
 	var agentVersion sql.NullString
 	var version sql.NullString
 	var startedAt sql.NullTime
 
 	err := r.db.QueryRowContext(ctx, query, name).Scan(
-		&node.ID, &node.Name, &node.Port, &node.Status, &node.GameType, &version,
-		&agentVersion, &node.HeartbeatInterval, &lastHeartbeat,
+		&node.ID, &node.Name, &node.Port, &node.GameType, &version,
+		&agentVersion, &node.HeartbeatInterval,
 		&node.CreatedAt, &node.UpdatedAt, &startedAt,
 	)
 
@@ -133,39 +132,27 @@ func (r *NodeRepository) GetByName(ctx context.Context, name string) (*models.No
 	if version.Valid {
 		node.Version = version.String
 	}
-	if lastHeartbeat.Valid {
-		node.LastHeartbeat = lastHeartbeat.Time
-	}
 	if startedAt.Valid {
 		node.StartedAt = startedAt
 	}
+
+	// Status is fetched from node agent via gRPC, default to stopped
+	node.Status = models.NodeStatusStopped
 
 	return &node, nil
 }
 
 // List retrieves all nodes
-func (r *NodeRepository) List(ctx context.Context, status *models.NodeStatus) ([]*models.Node, error) {
-	var query string
-	var args []interface{}
+func (r *NodeRepository) List(ctx context.Context, _ *models.NodeStatus) ([]*models.Node, error) {
+	// Note: status filtering is now done in-memory after fetching from node agents
+	query := `
+		SELECT id, name, port, game_type, version,
+			agent_version, heartbeat_interval,
+			created_at, updated_at, started_at
+		FROM nodes ORDER BY created_at DESC
+	`
 
-	if status != nil {
-		query = `
-			SELECT id, name, port, status, game_type, version,
-				agent_version, heartbeat_interval, last_heartbeat,
-				created_at, updated_at, started_at
-			FROM nodes WHERE status = $1 ORDER BY created_at DESC
-		`
-		args = []interface{}{*status}
-	} else {
-		query = `
-			SELECT id, name, port, status, game_type, version,
-				agent_version, heartbeat_interval, last_heartbeat,
-				created_at, updated_at, started_at
-			FROM nodes ORDER BY created_at DESC
-		`
-	}
-
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list nodes: %w", err)
 	}
@@ -174,14 +161,13 @@ func (r *NodeRepository) List(ctx context.Context, status *models.NodeStatus) ([
 	var nodes []*models.Node
 	for rows.Next() {
 		var node models.Node
-		var lastHeartbeat sql.NullTime
 		var agentVersion sql.NullString
 		var version sql.NullString
 		var startedAt sql.NullTime
 
 		if err := rows.Scan(
-			&node.ID, &node.Name, &node.Port, &node.Status, &node.GameType, &version,
-			&agentVersion, &node.HeartbeatInterval, &lastHeartbeat,
+			&node.ID, &node.Name, &node.Port, &node.GameType, &version,
+			&agentVersion, &node.HeartbeatInterval,
 			&node.CreatedAt, &node.UpdatedAt, &startedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan node: %w", err)
@@ -193,12 +179,12 @@ func (r *NodeRepository) List(ctx context.Context, status *models.NodeStatus) ([
 		if version.Valid {
 			node.Version = version.String
 		}
-		if lastHeartbeat.Valid {
-			node.LastHeartbeat = lastHeartbeat.Time
-		}
 		if startedAt.Valid {
 			node.StartedAt = startedAt
 		}
+
+		// Status is fetched from node agent via gRPC, default to stopped
+		node.Status = models.NodeStatusStopped
 
 		nodes = append(nodes, &node)
 	}
@@ -212,31 +198,19 @@ func (r *NodeRepository) Update(ctx context.Context, node *models.Node) error {
 
 	query := `
 		UPDATE nodes SET
-			name = $1, port = $2, status = $3, game_type = $4, version = $5,
-			heartbeat_interval = $6, last_heartbeat = $7, updated_at = $8, started_at = $9
-		WHERE id = $10
+			name = $1, port = $2, game_type = $3, version = $4,
+			heartbeat_interval = $5, updated_at = $6, started_at = $7
+		WHERE id = $8
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
-		node.Name, node.Port, node.Status, node.GameType, node.Version,
-		node.HeartbeatInterval, node.LastHeartbeat, node.UpdatedAt, node.StartedAt,
+		node.Name, node.Port, node.GameType, node.Version,
+		node.HeartbeatInterval, node.UpdatedAt, node.StartedAt,
 		node.ID,
 	)
 
 	if err != nil {
 		return fmt.Errorf("failed to update node: %w", err)
-	}
-
-	return nil
-}
-
-// UpdateHeartbeat updates the last heartbeat time
-func (r *NodeRepository) UpdateHeartbeat(ctx context.Context, id string, heartbeat time.Time) error {
-	query := `UPDATE nodes SET last_heartbeat = $1, updated_at = $2 WHERE id = $3`
-
-	_, err := r.db.ExecContext(ctx, query, heartbeat, time.Now(), id)
-	if err != nil {
-		return fmt.Errorf("failed to update heartbeat: %w", err)
 	}
 
 	return nil
@@ -252,27 +226,4 @@ func (r *NodeRepository) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
-}
-
-// CountByStatus counts nodes by status
-func (r *NodeRepository) CountByStatus(ctx context.Context) (map[models.NodeStatus]int, error) {
-	query := `SELECT status, COUNT(*) FROM nodes GROUP BY status`
-
-	rows, err := r.db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to count nodes: %w", err)
-	}
-	defer rows.Close()
-
-	result := make(map[models.NodeStatus]int)
-	for rows.Next() {
-		var status models.NodeStatus
-		var count int
-		if err := rows.Scan(&status, &count); err != nil {
-			return nil, fmt.Errorf("failed to scan count: %w", err)
-		}
-		result[status] = count
-	}
-
-	return result, nil
 }

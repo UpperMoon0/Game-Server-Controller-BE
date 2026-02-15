@@ -1,50 +1,35 @@
 package scheduler
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	"github.com/game-server/controller/internal/core/models"
-	"github.com/game-server/controller/internal/core/repository"
 	nodepkg "github.com/game-server/controller/internal/node"
 	"go.uber.org/zap"
 )
 
 // Scheduler handles resource allocation and node lifecycle
+// Note: Node status is managed by node agents, not stored in DB
 type Scheduler struct {
-	nodeRepo *repository.NodeRepository
-	nodeMgr  *nodepkg.Manager
-	logger   *zap.Logger
+	nodeMgr *nodepkg.Manager
+	logger  *zap.Logger
 }
 
 // NewScheduler creates a new scheduler
 func NewScheduler(
-	nodeRepo *repository.NodeRepository,
 	nodeMgr *nodepkg.Manager,
 	logger *zap.Logger,
 ) *Scheduler {
 	return &Scheduler{
-		nodeRepo: nodeRepo,
-		nodeMgr:  nodeMgr,
-		logger:   logger,
+		nodeMgr: nodeMgr,
+		logger:  logger,
 	}
 }
 
-// StartNode starts a node
-func (s *Scheduler) StartNode(ctx context.Context, nodeID string) error {
-	node, err := s.nodeMgr.GetNode(nodeID)
-	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
-	}
-
-	// Update status
-	node.Status = models.NodeStatusStarting
-	if err := s.nodeRepo.Update(ctx, node); err != nil {
-		return fmt.Errorf("failed to update status: %w", err)
-	}
-
-	// Send start command to node
+// StartNode sends a start command to a node agent
+func (s *Scheduler) StartNode(nodeID string) error {
+	// Send start command to node agent
 	cmd := &nodepkg.Command{
 		ID:   generateCommandID(),
 		Type: nodepkg.CommandTypeStart,
@@ -55,28 +40,15 @@ func (s *Scheduler) StartNode(ctx context.Context, nodeID string) error {
 	}
 
 	if err := s.nodeMgr.SendCommand(nodeID, cmd); err != nil {
-		node.Status = models.NodeStatusStopped
-		s.nodeRepo.Update(ctx, node)
 		return fmt.Errorf("failed to send start command: %w", err)
 	}
 
 	return nil
 }
 
-// StopNode stops a node
-func (s *Scheduler) StopNode(ctx context.Context, nodeID string) error {
-	node, err := s.nodeMgr.GetNode(nodeID)
-	if err != nil {
-		return fmt.Errorf("node not found: %w", err)
-	}
-
-	// Update status
-	node.Status = models.NodeStatusStopping
-	if err := s.nodeRepo.Update(ctx, node); err != nil {
-		return fmt.Errorf("failed to update status: %w", err)
-	}
-
-	// Send stop command to node
+// StopNode sends a stop command to a node agent
+func (s *Scheduler) StopNode(nodeID string) error {
+	// Send stop command to node agent
 	cmd := &nodepkg.Command{
 		ID:   generateCommandID(),
 		Type: nodepkg.CommandTypeStop,
@@ -87,8 +59,6 @@ func (s *Scheduler) StopNode(ctx context.Context, nodeID string) error {
 	}
 
 	if err := s.nodeMgr.SendCommand(nodeID, cmd); err != nil {
-		node.Status = models.NodeStatusRunning
-		s.nodeRepo.Update(ctx, node)
 		return fmt.Errorf("failed to send stop command: %w", err)
 	}
 
@@ -96,22 +66,31 @@ func (s *Scheduler) StopNode(ctx context.Context, nodeID string) error {
 }
 
 // RestartNode restarts a node
-func (s *Scheduler) RestartNode(ctx context.Context, nodeID string) error {
+func (s *Scheduler) RestartNode(nodeID string) error {
 	// Stop then start
-	if err := s.StopNode(ctx, nodeID); err != nil {
+	if err := s.StopNode(nodeID); err != nil {
 		return err
 	}
 
 	// Wait for stop
 	time.Sleep(5 * time.Second)
 
-	return s.StartNode(ctx, nodeID)
+	return s.StartNode(nodeID)
 }
 
-// GetNodeCounts returns node counts by status
+// GetNodeCounts returns node counts by status (fetched from node agents via node manager)
 func (s *Scheduler) GetNodeCounts() (map[models.NodeStatus]int, error) {
-	ctx := context.Background()
-	return s.nodeRepo.CountByStatus(ctx)
+	metrics, err := s.nodeMgr.GetClusterMetrics()
+	if err != nil {
+		return nil, err
+	}
+	
+	counts := make(map[models.NodeStatus]int)
+	counts[models.NodeStatusRunning] = metrics.OnlineNodes
+	counts[models.NodeStatusOffline] = metrics.OfflineNodes
+	counts[models.NodeStatusStopped] = metrics.TotalNodes - metrics.OnlineNodes - metrics.OfflineNodes
+	
+	return counts, nil
 }
 
 // Helper functions

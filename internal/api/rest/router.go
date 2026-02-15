@@ -13,7 +13,6 @@ import (
 	"github.com/game-server/controller/internal/api/rest/handlers"
 	"github.com/game-server/controller/internal/docker"
 	"github.com/game-server/controller/internal/node"
-	"github.com/game-server/controller/internal/scheduler"
 	"github.com/game-server/controller/pkg/config"
 	"go.uber.org/zap"
 )
@@ -24,7 +23,6 @@ type Server struct {
 	httpServer   *http.Server
 	cfg          *config.Config
 	nodeMgr      *node.Manager
-	scheduler    *scheduler.Scheduler
 	containerMgr *docker.ContainerManager
 	logger       *zap.Logger
 }
@@ -33,7 +31,6 @@ type Server struct {
 func NewServer(
 	cfg *config.Config,
 	nodeMgr *node.Manager,
-	scheduler *scheduler.Scheduler,
 	containerMgr *docker.ContainerManager,
 	logger *zap.Logger,
 ) *Server {
@@ -51,7 +48,6 @@ func NewServer(
 		router:       router,
 		cfg:          cfg,
 		nodeMgr:      nodeMgr,
-		scheduler:    scheduler,
 		containerMgr: containerMgr,
 		logger:       logger,
 	}
@@ -108,7 +104,7 @@ func (s *Server) registerRoutes() {
 	v1 := s.router.Group("/api/v1")
 	{
 		// Register node handler
-		nodeHandler := handlers.NewNodeHandler(s.nodeMgr, s.scheduler, s.containerMgr, s.cfg, s.logger)
+		nodeHandler := handlers.NewNodeHandler(s.nodeMgr, s.containerMgr, s.cfg, s.logger)
 		nodeHandler.RegisterRoutes(v1)
 
 		// Metrics endpoint
@@ -156,20 +152,17 @@ func (s *Server) getClusterMetrics(c *gin.Context) {
 		return
 	}
 
-	// Get node counts by status
-	nodeCounts, err := s.scheduler.GetNodeCounts()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to get node counts",
-			"message": err.Error(),
-		})
-		return
+	// Build node counts from cluster metrics
+	nodeCounts := map[string]int{
+		"running": clusterMetrics.OnlineNodes,
+		"offline": clusterMetrics.OfflineNodes,
+		"stopped": clusterMetrics.TotalNodes - clusterMetrics.OnlineNodes - clusterMetrics.OfflineNodes,
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"nodes":     clusterMetrics,
+		"nodes":       clusterMetrics,
 		"node_counts": nodeCounts,
-		"timestamp": time.Now().UTC(),
+		"timestamp":   time.Now().UTC(),
 	})
 }
 
@@ -233,7 +226,7 @@ func CORSMiddleware() gin.HandlerFunc {
 
 // RunServer starts the REST API server (standalone function for testing)
 func RunServer(cfg *config.Config, logger *zap.Logger) error {
-	server := NewServer(nil, nil, nil, nil, logger)
+	server := NewServer(nil, nil, nil, logger)
 	
 	if err := server.Start(); err != nil {
 		return err
