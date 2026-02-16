@@ -96,6 +96,7 @@ func Load(configPath string) (*Config, error) {
 		v.AddConfigPath(".")
 		v.AddConfigPath("./config")
 		v.AddConfigPath("/etc/game-server-controller")
+		v.AddConfigPath("/app/data") // Check for config in persistent data directory
 	}
 
 	// Environment variables
@@ -111,6 +112,15 @@ func Load(configPath string) (*Config, error) {
 	// Get the actual config file path used
 	if resolvedConfigPath == "" {
 		resolvedConfigPath = v.ConfigFileUsed()
+	}
+	
+	// If no config file was found, use /app/data/config.yaml for persistence
+	// This ensures settings are saved to the mounted volume
+	if resolvedConfigPath == "" {
+		// Check if /app/data exists (Docker volume mount point)
+		if _, err := os.Stat("/app/data"); err == nil {
+			resolvedConfigPath = "/app/data/config.yaml"
+		}
 	}
 
 	var config Config
