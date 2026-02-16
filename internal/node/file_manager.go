@@ -483,7 +483,16 @@ func (m *Manager) sendFileCommand(ctx context.Context, nodeID string, cmd *FileC
 	m.mu.RUnlock()
 
 	if !exists {
-		return nil, fmt.Errorf("node not found: %s", nodeID)
+		// Check if node exists in database but is offline
+		node, err := m.nodeRepo.GetByID(ctx, nodeID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check node existence: %w", err)
+		}
+		if node == nil {
+			return nil, fmt.Errorf("node not found: %s", nodeID)
+		}
+		// Node exists in DB but is not connected (offline)
+		return nil, fmt.Errorf("node is offline: %s (node agent not connected)", nodeID)
 	}
 
 	if !state.Connected {
