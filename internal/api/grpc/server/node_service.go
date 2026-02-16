@@ -95,15 +95,16 @@ func (s *nodeServiceServer) StreamEvents(stream proto.NodeService_StreamEventsSe
 		)
 
 		// Handle command results
-		if event.Type == proto.EventType_EVENT_TYPE_COMMAND_RESULT && event.CommandResult != nil {
+		if event.Type == proto.EventType_EVENT_TYPE_COMMAND_RESULT && event.GetCommandResult() != nil {
+			cmdResult := event.GetCommandResult()
 			s.logger.Info("Received command result",
 				zap.String("nodeId", nodeID),
-				zap.String("commandId", event.CommandResult.CommandId),
-				zap.Bool("success", event.CommandResult.Success),
-				zap.String("message", event.CommandResult.Message))
+				zap.String("commandId", cmdResult.CommandId),
+				zap.Bool("success", cmdResult.Success),
+				zap.String("message", cmdResult.Message))
 
 			// Handle the command result through the manager
-			s.manager.HandleCommandResult(nodeID, event.CommandResult.CommandId, event.CommandResult.Success, event.CommandResult.Message)
+			s.manager.HandleCommandResult(nodeID, cmdResult.CommandId, cmdResult.Success, cmdResult.Message)
 			continue
 		}
 
@@ -222,20 +223,26 @@ func convertCommandToProto(cmd *node.Command) *proto.ControllerCommand {
 	switch cmd.Type {
 	case node.CommandTypeInitialize:
 		if gameType, ok := cmd.Payload.(string); ok {
-			protoCmd.InitializeNode = &proto.InitializeNodeCmd{
-				GameType: gameType,
+			protoCmd.Payload = &proto.ControllerCommand_InitializeNode{
+				InitializeNode: &proto.InitializeNodeCommand{
+					GameType: gameType,
+				},
 			}
 		}
 	case node.CommandTypeStart:
 		if serverID, ok := cmd.Payload.(string); ok {
-			protoCmd.StartServer = &proto.StartServerCmd{
-				ServerId: serverID,
+			protoCmd.Payload = &proto.ControllerCommand_StartServer{
+				StartServer: &proto.StartServerCommand{
+					ServerId: serverID,
+				},
 			}
 		}
 	case node.CommandTypeStop:
 		if serverID, ok := cmd.Payload.(string); ok {
-			protoCmd.StopServer = &proto.StopServerCmd{
-				ServerId: serverID,
+			protoCmd.Payload = &proto.ControllerCommand_StopServer{
+				StopServer: &proto.StopServerCommand{
+					ServerId: serverID,
+				},
 			}
 		}
 	}
