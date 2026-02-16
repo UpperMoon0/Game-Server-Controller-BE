@@ -156,6 +156,9 @@ func (cm *ContainerManager) CreateNodeContainer(ctx context.Context, cfg *NodeCo
 			NanoCPUs: int64(cfg.TotalCPUCores) * 1e9,
 			Memory:   cfg.TotalMemoryMB * 1024 * 1024,
 		},
+		// Add host.docker.internal mapping for Linux compatibility
+		// This allows node containers to reach the controller on the host
+		ExtraHosts: []string{"host.docker.internal:host-gateway"},
 	}
 
 	// Network configuration
@@ -478,6 +481,9 @@ func (cm *ContainerManager) UpdateNodeContainer(ctx context.Context, nodeID stri
 			Name: "unless-stopped",
 		},
 		Resources: info.HostConfig.Resources,
+		// Add host.docker.internal mapping for Linux compatibility
+		// This allows node containers to reach the controller on the host
+		ExtraHosts: []string{"host.docker.internal:host-gateway"},
 	}
 
 	// Network configuration
