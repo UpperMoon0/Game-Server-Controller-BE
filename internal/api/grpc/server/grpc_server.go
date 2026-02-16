@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/game-server/controller/internal/api/grpc/proto"
+	pb "github.com/nstut/game-server-proto/gen"
 	"github.com/game-server/controller/internal/node"
 	"github.com/game-server/controller/pkg/config"
 	"go.uber.org/zap"
@@ -68,7 +68,7 @@ func NewGRPCServer(
 // Start starts the gRPC server
 func (s *GRPCServer) Start() error {
 	// Register services
-	proto.RegisterNodeServiceServer(s.grpcServer, NewNodeServiceServer(s.nodeMgr, s.logger))
+	pb.RegisterNodeServiceServer(s.grpcServer, NewNodeServiceServer(s.nodeMgr, s.logger))
 
 	// Enable reflection for development
 	if s.cfg.Environment != "production" {

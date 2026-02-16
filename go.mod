@@ -2,12 +2,16 @@ module github.com/game-server/controller
 
 go 1.21
 
+// Use local proto module for development
+replace github.com/nstut/game-server-proto => ../Game-Server-Proto
+
 require (
 	github.com/docker/docker v26.1.5+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
+	github.com/nstut/game-server-proto v0.0.0-latest
 	github.com/spf13/viper v1.18.1
 	go.uber.org/zap v1.26.0
 	google.golang.org/grpc v1.64.0
