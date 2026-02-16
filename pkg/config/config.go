@@ -93,10 +93,12 @@ func Load(configPath string) (*Config, error) {
 	} else {
 		v.SetConfigName("config")
 		v.SetConfigType("yaml")
+		// IMPORTANT: Add /app/data FIRST so it takes priority over the embedded config
+		// This ensures settings are saved to the persistent volume
+		v.AddConfigPath("/app/data")
 		v.AddConfigPath(".")
 		v.AddConfigPath("./config")
 		v.AddConfigPath("/etc/game-server-controller")
-		v.AddConfigPath("/app/data") // Check for config in persistent data directory
 	}
 
 	// Environment variables
