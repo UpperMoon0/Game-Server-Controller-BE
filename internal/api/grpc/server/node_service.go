@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	pb "github.com/nstut/game-server-proto/gen"
+	pb "github.com/UpperMoon0/game-server-proto/gen"
 	"github.com/game-server/controller/internal/core/models"
 	"github.com/game-server/controller/internal/node"
 	"go.uber.org/zap"

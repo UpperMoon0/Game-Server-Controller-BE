@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	pb "github.com/nstut/game-server-proto/gen"
+	pb "github.com/UpperMoon0/game-server-proto/gen"
 	"github.com/game-server/controller/internal/node"
 	"github.com/game-server/controller/pkg/config"
 	"go.uber.org/zap"
