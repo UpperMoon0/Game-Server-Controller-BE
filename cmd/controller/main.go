@@ -19,7 +19,8 @@ import (
 
 func main() {
 	// Load configuration
-	configPath := "config.yaml"
+	// Default to /app/data/config.yaml for persistence in Docker volume
+	configPath := "/app/data/config.yaml"
 	if envPath := os.Getenv("CONFIG_PATH"); envPath != "" {
 		configPath = envPath
 	}

@@ -33,6 +33,12 @@ flyway \
 
 echo "Migrations completed!"
 
+# Initialize config file in volume if it doesn't exist
+if [ ! -f /app/data/config.yaml ]; then
+    echo "Initializing config file in volume..."
+    cp /app/config.yaml /app/data/config.yaml
+fi
+
 # Start the controller
 echo "Starting controller..."
 exec ./controller "$@"

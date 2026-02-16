@@ -39,6 +39,9 @@ COPY --from=builder /app/controller .
 # Copy migrations
 COPY --from=builder /app/migrations ./migrations
 
+# Copy default config file
+COPY config.yaml /app/config.yaml
+
 # Copy and set entrypoint script
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
