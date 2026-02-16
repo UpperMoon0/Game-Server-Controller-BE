@@ -85,44 +85,26 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("LOG_FORMAT", "json")
 	v.SetDefault("CLUSTER_ENABLED", false)
 
-	// Set config file
+	// Determine config file path
+	// Always use /app/data/config.yaml for persistence in Docker volume
 	var resolvedConfigPath string
 	if configPath != "" {
-		v.SetConfigFile(configPath)
 		resolvedConfigPath = configPath
 	} else {
-		v.SetConfigName("config")
-		v.SetConfigType("yaml")
-		// IMPORTANT: Add /app/data FIRST so it takes priority over the embedded config
-		// This ensures settings are saved to the persistent volume
-		v.AddConfigPath("/app/data")
-		v.AddConfigPath(".")
-		v.AddConfigPath("./config")
-		v.AddConfigPath("/etc/game-server-controller")
+		resolvedConfigPath = "/app/data/config.yaml"
 	}
+
+	v.SetConfigFile(resolvedConfigPath)
 
 	// Environment variables
 	v.AutomaticEnv()
 
-	// Read config file
+	// Read config file - if not found, defaults will be used and file will be created on save
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
-	}
-
-	// Get the actual config file path used
-	if resolvedConfigPath == "" {
-		resolvedConfigPath = v.ConfigFileUsed()
-	}
-	
-	// If no config file was found, use /app/data/config.yaml for persistence
-	// This ensures settings are saved to the mounted volume
-	if resolvedConfigPath == "" {
-		// Check if /app/data exists (Docker volume mount point)
-		if _, err := os.Stat("/app/data"); err == nil {
-			resolvedConfigPath = "/app/data/config.yaml"
-		}
+		// Config file not found - will be created when settings are saved
 	}
 
 	var config Config

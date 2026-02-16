@@ -35,7 +35,6 @@ WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /app/controller .
-COPY --from=builder /app/config.yaml .
 
 # Copy migrations
 COPY --from=builder /app/migrations ./migrations
@@ -49,9 +48,6 @@ RUN mkdir -p /app/data /app/logs
 
 # Expose ports
 EXPOSE 8080 50051
-
-# Set environment variables
-ENV CONFIG_PATH=/app/config.yaml
 
 # Entry point - runs migration script then starts controller
 ENTRYPOINT ["./entrypoint.sh"]
