@@ -101,7 +101,8 @@ func Load(configPath string) (*Config, error) {
 
 	// Read config file - if not found, defaults will be used and file will be created on save
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		// When using SetConfigFile, Viper returns os.PathError instead of ConfigFileNotFoundError
+		if !os.IsNotExist(err) {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
 		// Config file not found - will be created when settings are saved
