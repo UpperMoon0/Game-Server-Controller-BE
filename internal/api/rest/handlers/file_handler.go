@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -74,6 +76,11 @@ func (h *FileHandler) ListFiles(c *gin.Context) {
 
 	result, err := h.nodeMgr.ListFiles(c.Request.Context(), nodeID, path, recursive)
 	if err != nil {
+		// Check if the context was canceled (client disconnected)
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("File listing canceled by client", zap.String("node_id", nodeID))
+			return // Don't send response, client is gone
+		}
 		h.logger.Error("Failed to list files", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -107,6 +114,10 @@ func (h *FileHandler) CreateDirectory(c *gin.Context) {
 
 	err := h.nodeMgr.CreateFile(c.Request.Context(), nodeID, req.Path, true)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Create directory canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to create directory", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -139,6 +150,10 @@ func (h *FileHandler) CreateFile(c *gin.Context) {
 
 	err := h.nodeMgr.CreateFile(c.Request.Context(), nodeID, req.Path, false)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Create file canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to create file", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -169,6 +184,10 @@ func (h *FileHandler) DeleteFile(c *gin.Context) {
 
 	err := h.nodeMgr.DeleteFile(c.Request.Context(), nodeID, path, recursive)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Delete file canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to delete file", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -202,6 +221,10 @@ func (h *FileHandler) RenameFile(c *gin.Context) {
 
 	err := h.nodeMgr.RenameFile(c.Request.Context(), nodeID, req.OldPath, req.NewPath)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Rename file canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to rename file", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -235,6 +258,10 @@ func (h *FileHandler) MoveFile(c *gin.Context) {
 
 	err := h.nodeMgr.MoveFile(c.Request.Context(), nodeID, req.SourcePath, req.DestPath)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Move file canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to move file", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -269,6 +296,10 @@ func (h *FileHandler) CopyFile(c *gin.Context) {
 
 	err := h.nodeMgr.CopyFile(c.Request.Context(), nodeID, req.SourcePath, req.DestPath, req.Recursive)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Copy file canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to copy file", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -298,6 +329,10 @@ func (h *FileHandler) ReadFile(c *gin.Context) {
 
 	result, err := h.nodeMgr.ReadFile(c.Request.Context(), nodeID, path)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Read file canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to read file", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -333,6 +368,10 @@ func (h *FileHandler) WriteFile(c *gin.Context) {
 
 	err := h.nodeMgr.WriteFile(c.Request.Context(), nodeID, req.Path, req.Content, req.Append)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Write file canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to write file", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -362,6 +401,10 @@ func (h *FileHandler) FileExists(c *gin.Context) {
 
 	result, err := h.nodeMgr.FileExists(c.Request.Context(), nodeID, path)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("File exists check canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to check file existence", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -396,6 +439,10 @@ func (h *FileHandler) Mkdir(c *gin.Context) {
 
 	err := h.nodeMgr.Mkdir(c.Request.Context(), nodeID, req.Path, req.Parents)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Mkdir canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to create directory", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -430,6 +477,10 @@ func (h *FileHandler) ZipFiles(c *gin.Context) {
 
 	err := h.nodeMgr.ZipFiles(c.Request.Context(), nodeID, req.SourcePath, req.DestPath, req.Recursive)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Zip files canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to zip files", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -463,6 +514,10 @@ func (h *FileHandler) UnzipFiles(c *gin.Context) {
 
 	err := h.nodeMgr.UnzipFiles(c.Request.Context(), nodeID, req.SourcePath, req.DestPath)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Unzip files canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to unzip files", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -511,6 +566,10 @@ func (h *FileHandler) UploadFolder(c *gin.Context) {
 	// Upload and extract
 	err = h.nodeMgr.UploadFolder(c.Request.Context(), nodeID, destPath, header.Filename, content)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Upload folder canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to upload folder", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -541,6 +600,10 @@ func (h *FileHandler) DownloadFolder(c *gin.Context) {
 	// Download and zip the folder
 	result, err := h.nodeMgr.DownloadFolder(c.Request.Context(), nodeID, path)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debug("Download folder canceled by client", zap.String("node_id", nodeID))
+			return
+		}
 		h.logger.Error("Failed to download folder", zap.Error(err), zap.String("node_id", nodeID))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
