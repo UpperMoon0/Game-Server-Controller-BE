@@ -31,16 +31,18 @@ func (s *nodeServiceServer) RegisterNode(ctx context.Context, req *proto.Registe
 		zap.String("nodeId", req.NodeId),
 		zap.String("hostname", req.Hostname),
 		zap.String("ipAddress", req.IpAddress),
+		zap.String("agentVersion", req.AgentVersion),
 	)
 
 	// Convert proto request to models.Node
 	nodeModel := &models.Node{
-		ID:          req.NodeId,
-		Name:        req.Hostname,
-		IPAddress:   req.IpAddress,
-		GameType:    req.GameType,
-		Initialized: req.Initialized,
-		Status:      models.NodeStatusRunning,
+		ID:           req.NodeId,
+		Name:         req.Hostname,
+		IPAddress:    req.IpAddress,
+		GameType:     req.GameType,
+		Initialized:  req.Initialized,
+		Status:       models.NodeStatusRunning,
+		AgentVersion: req.AgentVersion,
 	}
 
 	if req.Resources != nil {
