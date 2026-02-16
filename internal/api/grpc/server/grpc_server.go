@@ -42,6 +42,10 @@ func NewGRPCServer(
 			Time:                  1 * time.Minute,
 			Timeout:               20 * time.Second,
 		}),
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			MinTime:             5 * time.Second, // Allow pings as frequent as 5s
+			PermitWithoutStream: true,             // Allow pings without active streams
+		}),
 	)
 
 	// Add TLS if configured (optional)
