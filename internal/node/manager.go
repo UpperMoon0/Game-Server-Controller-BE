@@ -324,7 +324,7 @@ func (m *Manager) ListNodes() ([]*models.Node, error) {
 		return nil, fmt.Errorf("failed to list nodes from database: %w", err)
 	}
 
-	// Merge with in-memory state (for real-time status)
+	// Merge with in-memory state (for real-time status and agent info)
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -332,6 +332,10 @@ func (m *Manager) ListNodes() ([]*models.Node, error) {
 		if state, exists := m.nodes[node.ID]; exists {
 			// Update with real-time status from memory
 			node.Status = state.Node.Status
+			// Update with agent version from memory (set during registration)
+			if state.Node.AgentVersion != "" {
+				node.AgentVersion = state.Node.AgentVersion
+			}
 		}
 	}
 

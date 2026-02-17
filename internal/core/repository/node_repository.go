@@ -202,13 +202,13 @@ func (r *NodeRepository) Update(ctx context.Context, node *models.Node) error {
 	query := `
 		UPDATE nodes SET
 			name = $1, port = $2, game_type = $3, version = $4, initialized = $5,
-			heartbeat_interval = $6, updated_at = $7, started_at = $8
-		WHERE id = $9
+			agent_version = $6, heartbeat_interval = $7, updated_at = $8, started_at = $9
+		WHERE id = $10
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
 		node.Name, node.Port, node.GameType, node.Version, node.Initialized,
-		node.HeartbeatInterval, node.UpdatedAt, node.StartedAt,
+		node.AgentVersion, node.HeartbeatInterval, node.UpdatedAt, node.StartedAt,
 		node.ID,
 	)
 
