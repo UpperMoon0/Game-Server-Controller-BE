@@ -7,6 +7,7 @@ on:
       - completed
     branches:
       - main
+      - dev
   workflow_dispatch:
     inputs:
       image_tag:
@@ -19,10 +20,28 @@ jobs:
     runs-on: ubuntu-latest
     # Run if: build succeeded OR manually triggered
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      image_tag: ${{ steps.determine_tag.outputs.image_tag }}
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Determine image tag
+      id: determine_tag
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          # Manual dispatch - use provided tag or default
+          TAG="${{ github.event.inputs.image_tag || 'latest' }}"
+        elif [ "${{ github.event.workflow_run.head_branch }}" == "dev" ]; then
+          # Dev branch - use dev tag
+          TAG="dev"
+        else
+          # Main branch or other - use latest
+          TAG="latest"
+        fi
+        echo "image_tag=$TAG" >> $GITHUB_OUTPUT
+        echo "Using image tag: $TAG"
 
     - name: Azure Login
       uses: azure/login@v2
@@ -98,5 +117,5 @@ jobs:
           # Stop existing containers to free up ports
           docker compose down || true
 
-          docker pull nstut/game-server-controller-be:${{ github.event.inputs.image_tag || 'latest' }}
+          docker pull nstut/game-server-controller-be:${{ steps.determine_tag.outputs.image_tag }}
           docker compose -f docker-compose.yaml up -d --remove-orphans
