@@ -109,7 +109,19 @@ func (m *Manager) RegisterNode(ctx context.Context, node *models.Node) error {
 
 		m.logger.Info("Node reconnected",
 			zap.String("node_id", node.ID),
-			zap.String("name", node.Name))
+			zap.String("name", node.Name),
+			zap.String("agent_version", node.AgentVersion))
+
+		// Update agent_version in database even on reconnect
+		if node.AgentVersion != "" {
+			existingNode, err := m.nodeRepo.GetByID(ctx, node.ID)
+			if err == nil && existingNode != nil && existingNode.AgentVersion != node.AgentVersion {
+				existingNode.AgentVersion = node.AgentVersion
+				if err := m.nodeRepo.Update(ctx, existingNode); err != nil {
+					m.logger.Error("Failed to update node agent version", zap.Error(err))
+				}
+			}
+		}
 		return nil
 	}
 
@@ -127,7 +139,8 @@ func (m *Manager) RegisterNode(ctx context.Context, node *models.Node) error {
 	m.logger.Info("Node registered",
 		zap.String("node_id", node.ID),
 		zap.String("name", node.Name),
-		zap.String("game_type", node.GameType))
+		zap.String("game_type", node.GameType),
+		zap.String("agent_version", node.AgentVersion))
 
 	// Check if node exists in database, create if not
 	existingNode, err := m.nodeRepo.GetByID(ctx, node.ID)
