@@ -8,6 +8,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
+	github.com/UpperMoon0/game-server-proto v0.0.0-latest
 	github.com/spf13/viper v1.18.1
 	go.uber.org/zap v1.26.0
 	google.golang.org/grpc v1.64.0
