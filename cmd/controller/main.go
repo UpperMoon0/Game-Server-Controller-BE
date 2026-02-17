@@ -12,6 +12,7 @@ import (
 	"github.com/game-server/controller/internal/api/rest"
 	"github.com/game-server/controller/internal/core/repository"
 	"github.com/game-server/controller/internal/docker"
+	_ "github.com/game-server/controller/internal/grpc/codec" // Register JSON codec for gRPC
 	"github.com/game-server/controller/internal/node"
 	"github.com/game-server/controller/pkg/config"
 	"go.uber.org/zap"
